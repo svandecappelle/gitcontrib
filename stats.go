@@ -11,13 +11,18 @@ import (
 )
 
 const outOfRange = 99999
-const daysInLastYear = 365
-const weeksInLastYear = 52
+
+var durationInDays = 365
+var durationInWeeks = 52
 
 type column []int
 
 // stats calculates and prints the stats.
-func Stats(emailOrUsername string) {
+func Stats(emailOrUsername string, durationParamInWeeks *int) {
+	if durationParamInWeeks != nil && *durationParamInWeeks > 0 {
+		durationInDays = *durationParamInWeeks * 7
+		durationInWeeks = *durationParamInWeeks
+	}
 	commits := processRepositories(emailOrUsername)
 	printCommitsStats(commits)
 }
@@ -36,7 +41,7 @@ func countDaysSinceDate(date time.Time) int {
 	for date.Before(now) {
 		date = date.Add(time.Hour * 24)
 		days++
-		if days > daysInLastYear {
+		if days > durationInDays {
 			return outOfRange
 		}
 	}
@@ -94,7 +99,7 @@ func fillCommits(emailOrUsername string, path string, commits map[int]int) map[i
 func processRepositories(emailOrUsername string) map[int]int {
 	filePath := getDotFilePath()
 	repos := parseFileLinesToSlice(filePath)
-	daysInMap := daysInLastYear
+	daysInMap := durationInDays
 
 	commits := make(map[int]int, daysInMap)
 	for i := daysInMap; i > 0; i-- {
@@ -218,8 +223,8 @@ func buildCols(keys []int, commits map[int]int) map[int]column {
 func printCells(cols map[int]column) {
 	printMonths()
 	for j := 6; j >= 0; j-- {
-		for i := weeksInLastYear + 1; i >= 0; i-- {
-			if i == weeksInLastYear+1 {
+		for i := durationInWeeks + 1; i >= 0; i-- {
+			if i == durationInWeeks+1 {
 				printDayCol(j)
 			}
 			if col, ok := cols[i]; ok {
@@ -243,7 +248,7 @@ func printCells(cols map[int]column) {
 // printMonths prints the month names in the first line, determining when the month
 // changed between switching weeks
 func printMonths() {
-	week := getBeginningOfDay(time.Now()).Add(-(daysInLastYear * time.Hour * 24))
+	week := getBeginningOfDay(time.Now()).Add(-(time.Duration(durationInDays) * time.Hour * 24))
 	month := week.Month()
 	fmt.Printf("         ")
 	for {
@@ -269,12 +274,8 @@ func printDayCol(day int) {
 	switch day {
 	case 1:
 		out = " Mon "
-	case 2:
-		out = " Tue "
 	case 3:
 		out = " Wed "
-	case 4:
-		out = " Thu "
 	case 5:
 		out = " Fri "
 	}

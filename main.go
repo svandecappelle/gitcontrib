@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 
 	"github.com/urfave/cli"
 )
@@ -40,14 +41,18 @@ func commands(app *cli.App) {
 			Usage:   "Email: your@email.com - show constribution statistics of a user",
 			Action: func(c *cli.Context) {
 				email := c.Args().Get(0)
-				launchStats(email)
+				if n, err := strconv.Atoi(c.Args().Get(1)); err == nil {
+					launchStats(email, &n)
+				} else {
+					launchStats(email, nil)
+				}
 			},
 		},
 	}
 }
 
-func launchStats(email string) {
-	Stats(email)
+func launchStats(email string, durationInWeeks *int) {
+	Stats(email, durationInWeeks)
 }
 
 func launchScan(email string) {
