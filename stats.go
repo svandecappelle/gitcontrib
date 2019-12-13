@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"sort"
 	"strings"
 	"time"
@@ -17,7 +18,7 @@ var durationInWeeks = 52
 
 type column []int
 
-// stats calculates and prints the stats.
+// Stats calculates and prints the stats.
 func Stats(emailOrUsername string, durationParamInWeeks *int) {
 	if durationParamInWeeks != nil && *durationParamInWeeks > 0 {
 		durationInDays = *durationParamInWeeks * 7
@@ -59,6 +60,7 @@ func fillCommits(emailOrUsername string, path string, commits map[int]int) map[i
 	// get the HEAD reference
 	ref, err := repo.Head()
 	if err != nil {
+		log.Fatalf("Cannot get HEAD from repository: %s", path)
 		panic(err)
 	}
 	// get the commits history starting from HEAD

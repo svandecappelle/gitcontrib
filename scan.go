@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"os/user"
+	"path/filepath"
 	"strings"
 )
 
@@ -34,6 +35,10 @@ func openFile(filePath string) *os.File {
 			if err != nil {
 				panic(err)
 			}
+			f, err = os.OpenFile(filePath, os.O_APPEND|os.O_RDWR, 0755)
+			if err != nil {
+				panic(err)
+			}
 		} else {
 			// other error
 			panic(err)
@@ -45,8 +50,8 @@ func openFile(filePath string) *os.File {
 
 // parseFileLinesToSlice given a file path string, gets the content
 // of each line and parses it to a slice of strings.
-func parseFileLinesToSlice(filePath string) []string {
-	f := openFile(filePath)
+func parseFileLinesToSlice(configFilePath string) []string {
+	f := openFile(configFilePath)
 	defer f.Close()
 
 	var lines []string
@@ -104,13 +109,25 @@ func recursiveScanFolder(folder string) []string {
 	return scanGitFolders(make([]string, 0), folder)
 }
 
-// scan scans a new folder for Git repositories
+// Scan scans a new folder for Git repositories
 func Scan(folder string) {
-	fmt.Printf("Found folders:\n\n")
 	repositories := recursiveScanFolder(folder)
 	filePath := getDotFilePath()
 	addNewSliceElementsToFile(filePath, repositories)
-	fmt.Printf("\n\nSuccessfully added\n\n")
+}
+
+// List list all repositories wich saved to scan
+func List() {
+	configFilePath := getDotFilePath()
+	repositories := parseFileLinesToSlice(configFilePath)
+	fmt.Printf("Git folders:\n\n")
+	for _, repository := range repositories {
+		fmt.Printf("- %s\n", repository)
+	}
+}
+
+func shouldBeIgnored(folderName string) bool {
+	return folderName == "vendor" || folderName == "node_modules" || folderName == "venv"
 }
 
 // scanGitFolders returns a list of subfolders of `folder` ending with `.git`.
@@ -124,27 +141,32 @@ func scanGitFolders(folders []string, folder string) []string {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	pathFrom, err := os.Getwd()
+	if err != nil {
+		log.Fatal(err)
+		return folders
+	}
+	pathFrom = filepath.Join(pathFrom, folder)
 	files, err := f.Readdir(-1)
 	f.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	var path string
-
 	for _, file := range files {
 		if file.IsDir() {
-			path = folder + "/" + file.Name()
+			pathRelative := folder + "/" + file.Name()
+			pathAbsolute := filepath.Join(pathFrom, file.Name())
 			if file.Name() == ".git" {
-				path = strings.TrimSuffix(path, "/.git")
-				fmt.Println(path)
-				folders = append(folders, path)
+				pathAbsolute = strings.TrimSuffix(pathAbsolute, "/.git")
+				fmt.Printf("Folder %s added to scan list\n", pathAbsolute)
+				folders = append(folders, pathAbsolute)
 				continue
 			}
-			if file.Name() == "vendor" || file.Name() == "node_modules" {
+			if shouldBeIgnored(file.Name()) {
 				continue
 			}
-			folders = scanGitFolders(folders, path)
+			folders = scanGitFolders(folders, pathRelative)
 		}
 	}
 

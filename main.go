@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -10,9 +9,9 @@ import (
 )
 
 func info(app *cli.App) {
-	app.Name = "Simple pizza CLI"
-	app.Usage = "An example CLI for ordering pizza's"
-	app.Author = "Jeroenouw"
+	app.Name = "Simple git contribution scanner CLI"
+	app.Usage = ""
+	app.Author = "Steeve Vandecappelle"
 	app.Version = "1.0.0"
 }
 
@@ -24,7 +23,7 @@ func commands(app *cli.App) {
 			Usage:   "Add folder of git repository to scan for statistics",
 			Action: func(c *cli.Context) {
 				folder := c.Args().Get(0)
-				launchScan(folder)
+				addToScan(folder)
 			},
 		},
 		{
@@ -32,7 +31,7 @@ func commands(app *cli.App) {
 			Aliases: []string{"lr"},
 			Usage:   "List repositories to scan for statistic",
 			Action: func(c *cli.Context) {
-				fmt.Printf("TODO")
+				List()
 			},
 		},
 		{
@@ -55,8 +54,8 @@ func launchStats(email string, durationInWeeks *int) {
 	Stats(email, durationInWeeks)
 }
 
-func launchScan(email string) {
-	Scan(email)
+func addToScan(folder string) {
+	Scan(folder)
 }
 
 func main() {
