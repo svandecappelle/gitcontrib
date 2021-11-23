@@ -19,12 +19,12 @@ var durationInWeeks = 52
 type column []int
 
 // Stats calculates and prints the stats.
-func Stats(emailOrUsername string, durationParamInWeeks *int) {
+func Stats(emailOrUsername string, durationParamInWeeks *int, folder *string) {
 	if durationParamInWeeks != nil && *durationParamInWeeks > 0 {
 		durationInDays = *durationParamInWeeks * 7
 		durationInWeeks = *durationParamInWeeks
 	}
-	commits := processRepositories(emailOrUsername)
+	commits := processRepositories(emailOrUsername, folder)
 	printCommitsStats(commits)
 }
 
@@ -98,9 +98,17 @@ func fillCommits(emailOrUsername string, path string, commits map[int]int) map[i
 
 // processRepositories given an user email, returns the
 // commits made in the last 6 months
-func processRepositories(emailOrUsername string) map[int]int {
-	filePath := getDotFilePath()
-	repos := parseFileLinesToSlice(filePath)
+func processRepositories(emailOrUsername string, folder *string) map[int]int {
+    var repos []string
+	if folder == nil {
+        filePath := getDotFilePath()
+	    repos = parseFileLinesToSlice(filePath)
+    } else {
+        repos = []string{*folder}
+    }
+    if len(repos) == 0 {
+        repos = []string{"."}
+    }
 	daysInMap := durationInDays
 
 	commits := make(map[int]int, daysInMap)
@@ -163,7 +171,7 @@ func printCell(val int, today bool, firstDayOfMonth bool) {
 	}
 
 	if val == 0 {
-		fmt.Printf(escape + "  - " + "\033[0m")
+		fmt.Printf(escape + "\033[1;30;40m  - " + "\033[0m")
 		return
 	}
 
