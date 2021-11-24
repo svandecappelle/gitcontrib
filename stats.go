@@ -99,7 +99,7 @@ func Stats(emailOrUsername string, durationParamInWeeks *int, folder *string, de
 		durationInWeeks = *durationParamInWeeks
 	}
     start := end
-    start = start.AddDate(0, 0, *durationParamInWeeks / 7)
+    start = start.AddDate(0, 0, -*durationParamInWeeks * 7)
     fmt.Printf("Scanning for ")
     colorize(Message, emailOrUsername)
     fmt.Printf(" contributions from ")
