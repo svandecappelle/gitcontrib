@@ -2,7 +2,6 @@ package main
 
 import (
     "errors"
-    "fmt"
     "io/ioutil"
 	"log"
 	"os"
@@ -87,17 +86,22 @@ func commands() []*cli.Command {
                         folder = &folderToScan
                     }
                 }
-                return launchStats(email, weeks, folder)
+                return launchStats(email, weeks, folder, c.String("delta"))
 			},
+            Flags: []cli.Flag{
+                &cli.StringFlag{
+                    Name: "delta",
+                    Value: "",
+                    Usage: "Delta of starting watch commits",
+                },
+            },
 		},
     }
 }
 
-func launchStats(email string, durationInWeeks *int, folder *string) error {
-    fmt.Printf("\nScanning for %s contributions", email)
+func launchStats(email string, durationInWeeks *int, folder *string, delta string) error {
     width, _, _ := terminal.GetSize(0)
     if durationInWeeks != nil {
-        fmt.Printf(" over %d weeks\n", *durationInWeeks)
         if width < (4 * *durationInWeeks) + 16 {
             return errors.New("Too much data to display in this terminal width")
         }
@@ -105,8 +109,7 @@ func launchStats(email string, durationInWeeks *int, folder *string) error {
         defaultDuration := (width - 16) / 4
         durationInWeeks = &defaultDuration
     }
-    fmt.Println()
-	Stats(email, durationInWeeks, folder)
+	Stats(email, durationInWeeks, folder, delta)
     return nil
 }
 

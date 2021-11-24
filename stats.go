@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"log"
 	"sort"
+    "strconv"
 	"strings"
 	"time"
 
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
+
+    "github.com/fatih/color"
 )
 
 const outOfRange = 99999
@@ -18,14 +21,83 @@ var durationInWeeks = 52
 
 type column []int
 
+type Color struct {
+    Foreground color.Attribute
+    Background color.Attribute
+}
+
+var (
+    Today = Color{color.FgWhite, color.BgMagenta}
+    ValueLow = Color{color.FgBlack, color.BgWhite}
+    ValueMiddle = Color{color.FgBlack, color.BgYellow}
+    ValueHigh = Color{color.FgBlack, color.BgGreen}
+    Empty = Color{color.FgWhite, color.BgBlack}
+    Message = Color{color.FgGreen, color.BgBlack}
+)
+
+func colorize(c Color, s string) {
+    color.New(c.Foreground, c.Background).PrintfFunc()(s)
+}
+
 // Stats calculates and prints the stats.
-func Stats(emailOrUsername string, durationParamInWeeks *int, folder *string) {
+func Stats(emailOrUsername string, durationParamInWeeks *int, folder *string, delta string) {
+
+    nowDate := getBeginningOfDay(time.Now())
+    end := nowDate
+    switch {
+        case strings.Contains(delta, "y"):
+            value, err := strconv.Atoi(strings.Split(delta, "y")[0])
+            if err != nil {
+                panic("Error delta is not a number")
+            }
+            if value > 0 {
+                value = -value
+            }
+            end = nowDate.AddDate(value, 0, 0)
+        case strings.Contains(delta, "m"):
+            value, err := strconv.Atoi(strings.Split(delta, "m")[0])
+            if err != nil {
+                panic("Error delta is not a number")
+            }
+            if value > 0 {
+                value = -value
+            }
+            end = nowDate.AddDate(0, value, 0)
+        case strings.Contains(delta, "w"):
+            value, err := strconv.Atoi(strings.Split(delta, "w")[0])
+            if err != nil {
+                panic("Error delta is not a number")
+            }
+            if value > 0 {
+                value = -value
+            }
+            end = nowDate.AddDate(0, 0, value * 7)
+        case strings.Contains(delta, "d"):
+            value, err := strconv.Atoi(strings.Split(delta, "d")[0])
+            if err != nil {
+                panic("Error delta is not a number")
+            }
+            if value > 0 {
+                value = -value
+            }
+            end = nowDate.AddDate(0, 0, value)
+    }
+
 	if durationParamInWeeks != nil && *durationParamInWeeks > 0 {
 		durationInDays = *durationParamInWeeks * 7
 		durationInWeeks = *durationParamInWeeks
 	}
-	commits := processRepositories(emailOrUsername, folder)
-	printCommitsStats(commits)
+    start := end
+    start = start.AddDate(0, 0, *durationParamInWeeks / 7)
+    fmt.Printf("Scanning for ")
+    colorize(Message, emailOrUsername)
+    fmt.Printf(" contributions from ")
+    colorize(Message, fmt.Sprintf("%s", start))
+    fmt.Printf(" to ")
+    colorize(Message, fmt.Sprintf("%s\n\n", end))
+
+	commits := processRepositories(emailOrUsername, folder, end)
+	printCommitsStats(commits, end)
 }
 
 // getBeginningOfDay given a time.Time calculates the start time of that day
@@ -36,10 +108,15 @@ func getBeginningOfDay(t time.Time) time.Time {
 }
 
 // countDaysSinceDate counts how many days passed since the passed `date`
-func countDaysSinceDate(date time.Time) int {
+func countDaysSinceDate(date time.Time, end time.Time) int {
 	days := 0
-	now := getBeginningOfDay(time.Now())
-	for date.Before(now) {
+    endDate := getBeginningOfDay(end)
+    if !date.Before(endDate) && !date.Equal(endDate) {
+        return outOfRange
+    } else if date.Equal(endDate) {
+        return days
+    }
+	for date.Before(endDate) {
 		date = date.Add(time.Hour * 24)
 		days++
 		if days > durationInDays {
@@ -51,7 +128,7 @@ func countDaysSinceDate(date time.Time) int {
 
 // fillCommits given a repository found in `path`, gets the commits and
 // puts them in the `commits` map, returning it when completed
-func fillCommits(emailOrUsername string, path string, commits map[int]int) map[int]int {
+func fillCommits(emailOrUsername string, path string, commits map[int]int, endDate time.Time) map[int]int {
 	// instantiate a git repo object from path
 	repo, err := git.PlainOpen(path)
 	if err != nil {
@@ -69,9 +146,9 @@ func fillCommits(emailOrUsername string, path string, commits map[int]int) map[i
 		panic(err)
 	}
 	// iterate the commits
-	offset := calcOffset()
+	offset := calcOffset(endDate)
 	err = iterator.ForEach(func(c *object.Commit) error {
-		daysAgo := countDaysSinceDate(c.Author.When) + offset
+		daysAgo := countDaysSinceDate(c.Author.When, endDate) + offset
 
 		if strings.Contains(emailOrUsername, "@") {
 			if c.Author.Email != emailOrUsername {
@@ -98,7 +175,7 @@ func fillCommits(emailOrUsername string, path string, commits map[int]int) map[i
 
 // processRepositories given an user email, returns the
 // commits made in the last 6 months
-func processRepositories(emailOrUsername string, folder *string) map[int]int {
+func processRepositories(emailOrUsername string, folder *string, endDate time.Time) map[int]int {
     var repos []string
 	if folder == nil {
         filePath := getDotFilePath()
@@ -117,7 +194,7 @@ func processRepositories(emailOrUsername string, folder *string) map[int]int {
 	}
 
 	for _, path := range repos {
-		commits = fillCommits(emailOrUsername, path, commits)
+		commits = fillCommits(emailOrUsername, path, commits, endDate)
 	}
 
 	return commits
@@ -125,9 +202,9 @@ func processRepositories(emailOrUsername string, folder *string) map[int]int {
 
 // calcOffset determines and returns the amount of days missing to fill
 // the last row of the stats graph
-func calcOffset() int {
+func calcOffset(endDate time.Time) int {
 	var offset int
-	weekday := time.Now().Weekday()
+	weekday := endDate.Weekday()
 
 	switch weekday {
 	case time.Sunday:
@@ -151,46 +228,40 @@ func calcOffset() int {
 
 // printCell given a cell value prints it with a different format
 // based on the value amount, and on the `today` flag.
-func printCell(val int, today bool, firstDayOfMonth bool) {
-	escape := "\033[0;37;30m"
-	switch {
-	case val > 0 && val < 5:
-		escape = "\033[1;30;47m"
-	case val >= 5 && val < 10:
-		escape = "\033[1;30;43m"
-	case val >= 10:
-		escape = "\033[1;30;42m"
-	}
-
-	if today {
-		escape = "\033[1;37;45m"
-	}
-
-	if firstDayOfMonth {
-		escape = "\033[1;33;45m"
-	}
-
-	if val == 0 {
-		fmt.Printf(escape + "\033[1;30;40m  - " + "\033[0m")
-		return
-	}
-
+func printCell(val int, today bool) {
 	str := "  %d "
 	switch {
-	case val >= 10:
-		str = " %d "
-	case val >= 100:
-		str = "%d "
+        case val == 0:
+            str = "  - "
+    	case val >= 10:
+	    	str = " %d "
+    	case val >= 100:
+	    	str = "%d "
 	}
 
-	fmt.Printf(escape+str+"\033[0m", val)
+    cellContent := str
+    if val > 0 {
+        cellContent = fmt.Sprintf(str, val)
+    }
+    switch {
+        case today:
+            colorize(Today, cellContent)
+        case val == 0:
+            colorize(Empty, "  - ")
+        case val > 0 && val < 5:
+            colorize(ValueLow, cellContent)
+        case val >= 5 && val < 10:
+            colorize(ValueMiddle, cellContent)
+        default:
+            colorize(ValueHigh, cellContent)
+    }
 }
 
 // printCommitsStats prints the commits stats
-func printCommitsStats(commits map[int]int) {
+func printCommitsStats(commits map[int]int, endDate time.Time) {
 	keys := sortMapIntoSlice(commits)
 	cols := buildCols(keys, commits)
-	printCells(cols)
+	printCells(cols, endDate)
 }
 
 // sortMapIntoSlice returns a slice of indexes of a map, ordered
@@ -212,7 +283,7 @@ func buildCols(keys []int, commits map[int]int) map[int]column {
 	col := column{}
 
 	for _, k := range keys {
-		week := int(k / 7) //26,25...1
+		week := int(k / 7) // 26,25...1
 		dayinweek := k % 7 // 0,1,2,3,4,5,6
 
 		if dayinweek == 0 { //reset
@@ -230,8 +301,8 @@ func buildCols(keys []int, commits map[int]int) map[int]column {
 }
 
 // printCells prints the cells of the graph
-func printCells(cols map[int]column) {
-	printMonths()
+func printCells(cols map[int]column, endDate time.Time) {
+	printMonths(endDate)
 	for j := 6; j >= 0; j-- {
 		for i := durationInWeeks + 1; i >= 0; i-- {
 			if i == durationInWeeks+1 {
@@ -239,17 +310,17 @@ func printCells(cols map[int]column) {
 			}
 			if col, ok := cols[i]; ok {
 				//special case today
-				if i == 0 && j == calcOffset()-1 {
-					printCell(col[j], true, false)
+				if time.Now().Before(endDate) && i == 0 && j == calcOffset(time.Now())-1 {
+                    printCell(col[j], true)
 					continue
 				} else {
 					if len(col) > j {
-						printCell(col[j], false, false)
+						printCell(col[j], false)
 						continue
 					}
 				}
 			}
-			printCell(0, false, false)
+			printCell(0, false)
 		}
 		fmt.Printf("\n")
 	}
@@ -257,8 +328,8 @@ func printCells(cols map[int]column) {
 
 // printMonths prints the month names in the first line, determining when the month
 // changed between switching weeks
-func printMonths() {
-	week := getBeginningOfDay(time.Now()).Add(-(time.Duration(durationInDays) * time.Hour * 24))
+func printMonths(endDate time.Time) {
+	week := getBeginningOfDay(endDate).Add(-(time.Duration(durationInDays) * time.Hour * 24))
 	month := week.Month()
 	fmt.Printf("         ")
 	for {
@@ -270,7 +341,7 @@ func printMonths() {
 		}
 
 		week = week.Add(7 * time.Hour * 24)
-		if week.After(time.Now()) {
+		if week.After(endDate) {
 			break
 		}
 	}
