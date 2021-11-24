@@ -2,6 +2,7 @@ package main
 
 import (
     "errors"
+	"fmt"
     "io/ioutil"
 	"log"
 	"os"
@@ -38,8 +39,19 @@ func commands() []*cli.Command {
 			Aliases: []string{"ar"},
 			Usage:   "Add folder of git repository to scan for statistics",
 			Action: func(c *cli.Context) error {
-				folder := c.Args().Get(0)
-				addToScan(folder)
+				if c.NArg() > 0 {
+					argNum := 0
+					for argNum < c.NArg() {
+						arg := c.Args().Get(argNum)
+						if _, err := os.Stat(arg); err == nil {
+							addToScan(arg)
+						} else if errors.Is(err, os.ErrNotExist) {
+							fmt.Printf("Repository %s does not exists\n", arg)
+						}
+						argNum+=1
+					}
+                }
+
                 return nil
 			},
 		},

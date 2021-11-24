@@ -34,16 +34,22 @@ var (
     Empty = Color{color.FgWhite, color.BgBlack}
     Message = Color{color.FgGreen, color.BgBlack}
 	Error = Color{color.FgRed, color.Bold}
+	Header = Color{color.FgMagenta, color.Bold}
 )
 
 func colorize(c Color, s string) {
     color.New(c.Foreground, c.Background).PrintfFunc()(s)
 }
 
+func isRepo(path string) bool {
+	_, err := git.PlainOpen(path)
+	return err == nil
+}
+
 // Stats calculates and prints the stats.
 func Stats(emailOrUsername string, durationParamInWeeks *int, folder *string, delta string) {
     if folder != nil {
-		colorize(Message, *folder)
+		colorize(Header, *folder)
 		fmt.Println()
 	}
 
@@ -99,7 +105,9 @@ func Stats(emailOrUsername string, durationParamInWeeks *int, folder *string, de
     fmt.Printf(" contributions from ")
     colorize(Message, fmt.Sprintf("%s", start))
     fmt.Printf(" to ")
-    colorize(Message, fmt.Sprintf("%s\n\n", end))
+    colorize(Message, fmt.Sprintf("%s", end))
+	fmt.Println()
+	fmt.Println()
 
 	commits, err := processRepositories(emailOrUsername, folder, end)
 	if err != nil {
@@ -193,7 +201,7 @@ func processRepositories(emailOrUsername string, folder *string, endDate time.Ti
     } else {
         repos = []string{*folder}
     }
-    if len(repos) == 0 {
+    if len(repos) == 0 || isRepo(".") {
         repos = []string{"."}
     }
 	daysInMap := durationInDays
