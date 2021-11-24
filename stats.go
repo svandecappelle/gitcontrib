@@ -33,6 +33,7 @@ var (
     ValueHigh = Color{color.FgBlack, color.BgGreen}
     Empty = Color{color.FgWhite, color.BgBlack}
     Message = Color{color.FgGreen, color.BgBlack}
+	Error = Color{color.FgRed, color.Bold}
 )
 
 func colorize(c Color, s string) {
@@ -41,6 +42,10 @@ func colorize(c Color, s string) {
 
 // Stats calculates and prints the stats.
 func Stats(emailOrUsername string, durationParamInWeeks *int, folder *string, delta string) {
+    if folder != nil {
+		colorize(Message, *folder)
+		fmt.Println()
+	}
 
     nowDate := getBeginningOfDay(time.Now())
     end := nowDate
@@ -96,8 +101,13 @@ func Stats(emailOrUsername string, durationParamInWeeks *int, folder *string, de
     fmt.Printf(" to ")
     colorize(Message, fmt.Sprintf("%s\n\n", end))
 
-	commits := processRepositories(emailOrUsername, folder, end)
-	printCommitsStats(commits, end)
+	commits, err := processRepositories(emailOrUsername, folder, end)
+	if err != nil {
+		colorize(Error, fmt.Sprintf("%s", err))
+		fmt.Println()
+	} else {
+		printCommitsStats(commits, end)
+	}
 }
 
 // getBeginningOfDay given a time.Time calculates the start time of that day
@@ -128,22 +138,22 @@ func countDaysSinceDate(date time.Time, end time.Time) int {
 
 // fillCommits given a repository found in `path`, gets the commits and
 // puts them in the `commits` map, returning it when completed
-func fillCommits(emailOrUsername string, path string, commits map[int]int, endDate time.Time) map[int]int {
+func fillCommits(emailOrUsername string, path string, commits map[int]int, endDate time.Time) (map[int]int, error) {
 	// instantiate a git repo object from path
 	repo, err := git.PlainOpen(path)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	// get the HEAD reference
 	ref, err := repo.Head()
 	if err != nil {
 		log.Fatalf("Cannot get HEAD from repository: %s", path)
-		panic(err)
+		return nil, err
 	}
 	// get the commits history starting from HEAD
 	iterator, err := repo.Log(&git.LogOptions{From: ref.Hash()})
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	// iterate the commits
 	offset := calcOffset(endDate)
@@ -167,15 +177,15 @@ func fillCommits(emailOrUsername string, path string, commits map[int]int, endDa
 		return nil
 	})
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
-	return commits
+	return commits, nil
 }
 
 // processRepositories given an user email, returns the
 // commits made in the last 6 months
-func processRepositories(emailOrUsername string, folder *string, endDate time.Time) map[int]int {
+func processRepositories(emailOrUsername string, folder *string, endDate time.Time) (map[int]int, error) {
     var repos []string
 	if folder == nil {
         filePath := getDotFilePath()
@@ -189,15 +199,16 @@ func processRepositories(emailOrUsername string, folder *string, endDate time.Ti
 	daysInMap := durationInDays
 
 	commits := make(map[int]int, daysInMap)
+	var err error = nil
 	for i := daysInMap; i > 0; i-- {
 		commits[i] = 0
 	}
 
 	for _, path := range repos {
-		commits = fillCommits(emailOrUsername, path, commits, endDate)
+		commits, err = fillCommits(emailOrUsername, path, commits, endDate)
 	}
 
-	return commits
+	return commits, err
 }
 
 // calcOffset determines and returns the amount of days missing to fill

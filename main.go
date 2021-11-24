@@ -7,8 +7,6 @@ import (
 	"os"
     "os/user"
     "path/filepath"
-	"strconv"
-    "strings"
     "time"
     "golang.org/x/crypto/ssh/terminal"
 
@@ -59,40 +57,53 @@ func commands() []*cli.Command {
 			Aliases: []string{"s"},
 			Usage:   "Email: your@email.com - show constribution statistics of a user",
 			Action: func(c *cli.Context) error {
-                email := c.Args().Get(0)
-                shift := 0
-                if !strings.Contains(email, "@") {
-                    shift = 1
+                var folders []*string = make([]*string, 0)
+                var weeks *int = nil
+				var user *string = nil
+
+				if c.Int("weeks") > 0 {
+                    weeksParam := c.Int("weeks")
+                    weeks = &weeksParam
+                }
+
+                if c.NArg() > 0 {
+					argNum := 0
+					for argNum < c.NArg() {
+						arg := c.Args().Get(argNum)
+						if _, err := os.Stat(arg); err == nil {
+							folders = append(folders, &arg)
+						} else if errors.Is(err, os.ErrNotExist) {
+							user = &arg
+						}
+						argNum+=1
+					}
+                }
+                if user == nil {
                     _, gitEmail, err := getUserFromGitConfig()
                     if err != nil {
                         panic(err)
                     }
-                    email = *gitEmail
+                    user = gitEmail
                 }
-                var folder *string = nil
-                var weeks *int = nil
+				if len(folders) == 0 {
+					folders = []*string{nil}
+				}
 
-                if c.NArg() > 1 - shift {
-                    weekNumber, err := strconv.Atoi(c.Args().Get(1 - shift))
-                    if err != nil {
-                        // panic(fmt.Sprintf("Weeks parameter is not a number: %s", err))
-                        shift = shift + 1
-                    } else {
-                        weeks = &weekNumber
-                    }
-
-                    if c.NArg() > 2 - shift {
-                        folderToScan := c.Args().Get(2 - shift)
-                        folder = &folderToScan
-                    }
-                }
-                return launchStats(email, weeks, folder, c.String("delta"))
+				for _, folder := range folders {
+                	launchStats(*user, weeks, folder, c.String("delta"))
+				}
+				return nil
 			},
             Flags: []cli.Flag{
                 &cli.StringFlag{
                     Name: "delta",
                     Value: "",
                     Usage: "Delta of starting watch commits",
+                },
+                &cli.IntFlag{
+                    Name: "weeks",
+                    Value: -1,
+                    Usage: "Number of weeks to compute",
                 },
             },
 		},
