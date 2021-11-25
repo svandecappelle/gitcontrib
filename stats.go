@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"log"
 	"sort"
-    "strconv"
+	"strconv"
 	"strings"
 	"time"
 
 	"gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing/object"
 
-    "github.com/fatih/color"
+	"github.com/fatih/color"
 )
 
 const outOfRange = 99999
@@ -22,23 +22,23 @@ var durationInWeeks = 52
 type column []int
 
 type Color struct {
-    Foreground color.Attribute
-    Background color.Attribute
+	Foreground color.Attribute
+	Background color.Attribute
 }
 
 var (
-    Today = Color{color.FgWhite, color.BgMagenta}
-    ValueLow = Color{color.FgBlack, color.BgWhite}
-    ValueMiddle = Color{color.FgBlack, color.BgYellow}
-    ValueHigh = Color{color.FgBlack, color.BgGreen}
-    Empty = Color{color.FgWhite, color.BgBlack}
-    Message = Color{color.FgGreen, color.BgBlack}
-	Error = Color{color.FgRed, color.Bold}
-	Header = Color{color.FgMagenta, color.Bold}
+	Today       = Color{color.FgWhite, color.BgMagenta}
+	ValueLow    = Color{color.FgBlack, color.BgWhite}
+	ValueMiddle = Color{color.FgBlack, color.BgYellow}
+	ValueHigh   = Color{color.FgBlack, color.BgGreen}
+	Empty       = Color{color.FgWhite, color.BgBlack}
+	Message     = Color{color.FgGreen, color.BgBlack}
+	Error       = Color{color.FgRed, color.Bold}
+	Header      = Color{color.FgMagenta, color.Bold}
 )
 
 func colorize(c Color, s string) {
-    color.New(c.Foreground, c.Background).PrintfFunc()(s)
+	color.New(c.Foreground, c.Background).PrintfFunc()(s)
 }
 
 func isRepo(path string) bool {
@@ -48,64 +48,64 @@ func isRepo(path string) bool {
 
 // Stats calculates and prints the stats.
 func Stats(emailOrUsername string, durationParamInWeeks *int, folder *string, delta string) {
-    if folder != nil {
+	if folder != nil {
 		colorize(Header, *folder)
 		fmt.Println()
 	}
 
-    nowDate := getBeginningOfDay(time.Now())
-    end := nowDate
-    switch {
-        case strings.Contains(delta, "y"):
-            value, err := strconv.Atoi(strings.Split(delta, "y")[0])
-            if err != nil {
-                panic("Error delta is not a number")
-            }
-            if value > 0 {
-                value = -value
-            }
-            end = nowDate.AddDate(value, 0, 0)
-        case strings.Contains(delta, "m"):
-            value, err := strconv.Atoi(strings.Split(delta, "m")[0])
-            if err != nil {
-                panic("Error delta is not a number")
-            }
-            if value > 0 {
-                value = -value
-            }
-            end = nowDate.AddDate(0, value, 0)
-        case strings.Contains(delta, "w"):
-            value, err := strconv.Atoi(strings.Split(delta, "w")[0])
-            if err != nil {
-                panic("Error delta is not a number")
-            }
-            if value > 0 {
-                value = -value
-            }
-            end = nowDate.AddDate(0, 0, value * 7)
-        case strings.Contains(delta, "d"):
-            value, err := strconv.Atoi(strings.Split(delta, "d")[0])
-            if err != nil {
-                panic("Error delta is not a number")
-            }
-            if value > 0 {
-                value = -value
-            }
-            end = nowDate.AddDate(0, 0, value)
-    }
+	nowDate := getBeginningOfDay(time.Now())
+	end := nowDate
+	switch {
+	case strings.Contains(delta, "y"):
+		value, err := strconv.Atoi(strings.Split(delta, "y")[0])
+		if err != nil {
+			panic("Error delta is not a number")
+		}
+		if value > 0 {
+			value = -value
+		}
+		end = nowDate.AddDate(value, 0, 0)
+	case strings.Contains(delta, "m"):
+		value, err := strconv.Atoi(strings.Split(delta, "m")[0])
+		if err != nil {
+			panic("Error delta is not a number")
+		}
+		if value > 0 {
+			value = -value
+		}
+		end = nowDate.AddDate(0, value, 0)
+	case strings.Contains(delta, "w"):
+		value, err := strconv.Atoi(strings.Split(delta, "w")[0])
+		if err != nil {
+			panic("Error delta is not a number")
+		}
+		if value > 0 {
+			value = -value
+		}
+		end = nowDate.AddDate(0, 0, value*7)
+	case strings.Contains(delta, "d"):
+		value, err := strconv.Atoi(strings.Split(delta, "d")[0])
+		if err != nil {
+			panic("Error delta is not a number")
+		}
+		if value > 0 {
+			value = -value
+		}
+		end = nowDate.AddDate(0, 0, value)
+	}
 
 	if durationParamInWeeks != nil && *durationParamInWeeks > 0 {
 		durationInDays = *durationParamInWeeks * 7
 		durationInWeeks = *durationParamInWeeks
 	}
-    start := end
-    start = start.AddDate(0, 0, -*durationParamInWeeks * 7)
-    fmt.Printf("Scanning for ")
-    colorize(Message, emailOrUsername)
-    fmt.Printf(" contributions from ")
-    colorize(Message, fmt.Sprintf("%s", start))
-    fmt.Printf(" to ")
-    colorize(Message, fmt.Sprintf("%s", end))
+	start := end
+	start = start.AddDate(0, 0, -*durationParamInWeeks*7)
+	fmt.Printf("Scanning for ")
+	colorize(Message, emailOrUsername)
+	fmt.Printf(" contributions from ")
+	colorize(Message, fmt.Sprintf("%s", start))
+	fmt.Printf(" to ")
+	colorize(Message, fmt.Sprintf("%s", end))
 	fmt.Println()
 	fmt.Println()
 
@@ -128,12 +128,12 @@ func getBeginningOfDay(t time.Time) time.Time {
 // countDaysSinceDate counts how many days passed since the passed `date`
 func countDaysSinceDate(date time.Time, end time.Time) int {
 	days := 0
-    endDate := getBeginningOfDay(end)
-    if !date.Before(endDate) && !date.Equal(endDate) {
-        return outOfRange
-    } else if date.Equal(endDate) {
-        return days
-    }
+	endDate := getBeginningOfDay(end)
+	if !date.Before(endDate) && !date.Equal(endDate) {
+		return outOfRange
+	} else if date.Equal(endDate) {
+		return days
+	}
 	for date.Before(endDate) {
 		date = date.Add(time.Hour * 24)
 		days++
@@ -194,16 +194,16 @@ func fillCommits(emailOrUsername string, path string, commits map[int]int, endDa
 // processRepositories given an user email, returns the
 // commits made in the last 6 months
 func processRepositories(emailOrUsername string, folder *string, endDate time.Time) (map[int]int, error) {
-    var repos []string
+	var repos []string
 	if folder == nil {
-        filePath := getDotFilePath()
-	    repos = parseFileLinesToSlice(filePath)
-    } else {
-        repos = []string{*folder}
-    }
-    if len(repos) == 0 || isRepo(".") {
-        repos = []string{"."}
-    }
+		filePath := getDotFilePath()
+		repos = parseFileLinesToSlice(filePath)
+	} else {
+		repos = []string{*folder}
+	}
+	if len(repos) == 0 || isRepo(".") {
+		repos = []string{"."}
+	}
 	daysInMap := durationInDays
 
 	commits := make(map[int]int, daysInMap)
@@ -250,30 +250,30 @@ func calcOffset(endDate time.Time) int {
 func printCell(val int, today bool) {
 	str := "  %d "
 	switch {
-        case val == 0:
-            str = "  - "
-    	case val >= 10:
-	    	str = " %d "
-    	case val >= 100:
-	    	str = "%d "
+	case val == 0:
+		str = "  - "
+	case val >= 10:
+		str = " %d "
+	case val >= 100:
+		str = "%d "
 	}
 
-    cellContent := str
-    if val > 0 {
-        cellContent = fmt.Sprintf(str, val)
-    }
-    switch {
-        case today:
-            colorize(Today, cellContent)
-        case val == 0:
-            colorize(Empty, "  - ")
-        case val > 0 && val < 5:
-            colorize(ValueLow, cellContent)
-        case val >= 5 && val < 10:
-            colorize(ValueMiddle, cellContent)
-        default:
-            colorize(ValueHigh, cellContent)
-    }
+	cellContent := str
+	if val > 0 {
+		cellContent = fmt.Sprintf(str, val)
+	}
+	switch {
+	case today:
+		colorize(Today, cellContent)
+	case val == 0:
+		colorize(Empty, "  - ")
+	case val > 0 && val < 5:
+		colorize(ValueLow, cellContent)
+	case val >= 5 && val < 10:
+		colorize(ValueMiddle, cellContent)
+	default:
+		colorize(ValueHigh, cellContent)
+	}
 }
 
 // printCommitsStats prints the commits stats
@@ -330,7 +330,7 @@ func printCells(cols map[int]column, endDate time.Time) {
 			if col, ok := cols[i]; ok {
 				//special case today
 				if time.Now().Before(endDate) && i == 0 && j == calcOffset(time.Now())-1 {
-                    printCell(col[j], true)
+					printCell(col[j], true)
 					continue
 				} else {
 					if len(col) > j {
