@@ -47,11 +47,9 @@ func isRepo(path string) bool {
 }
 
 // Stats calculates and prints the stats.
-func Stats(emailOrUsername string, durationParamInWeeks *int, folder *string, delta string) {
-	if folder != nil {
-		colorize(Header, *folder)
-		fmt.Println()
-	}
+func Stats(emailOrUsername string, durationParamInWeeks *int, folders []string, delta string) {
+	colorize(Header, strings.Join(folders, ","))
+	fmt.Println()
 
 	nowDate := getBeginningOfDay(time.Now())
 	end := nowDate
@@ -109,13 +107,8 @@ func Stats(emailOrUsername string, durationParamInWeeks *int, folder *string, de
 	fmt.Println()
 	fmt.Println()
 
-	commits, err := processRepositories(emailOrUsername, folder, end)
-	if err != nil {
-		colorize(Error, fmt.Sprintf("%s", err))
-		fmt.Println()
-	} else {
-		printCommitsStats(commits, end)
-	}
+	commits := processRepositories(emailOrUsername, folders, end)
+	printCommitsStats(commits, end)
 }
 
 // getBeginningOfDay given a time.Time calculates the start time of that day
@@ -150,13 +143,13 @@ func fillCommits(emailOrUsername string, path string, commits map[int]int, endDa
 	// instantiate a git repo object from path
 	repo, err := git.PlainOpen(path)
 	if err != nil {
-		return nil, err
+		return commits, err
 	}
 	// get the HEAD reference
 	ref, err := repo.Head()
 	if err != nil {
 		log.Fatalf("Cannot get HEAD from repository: %s", path)
-		return nil, err
+		return commits, err
 	}
 	// get the commits history starting from HEAD
 	iterator, err := repo.Log(&git.LogOptions{From: ref.Hash()})
@@ -193,17 +186,7 @@ func fillCommits(emailOrUsername string, path string, commits map[int]int, endDa
 
 // processRepositories given an user email, returns the
 // commits made in the last 6 months
-func processRepositories(emailOrUsername string, folder *string, endDate time.Time) (map[int]int, error) {
-	var repos []string
-	if folder == nil {
-		filePath := getDotFilePath()
-		repos = parseFileLinesToSlice(filePath)
-	} else {
-		repos = []string{*folder}
-	}
-	if len(repos) == 0 || isRepo(".") {
-		repos = []string{"."}
-	}
+func processRepositories(emailOrUsername string, folders []string, endDate time.Time) map[int]int {
 	daysInMap := durationInDays
 
 	commits := make(map[int]int, daysInMap)
@@ -212,11 +195,16 @@ func processRepositories(emailOrUsername string, folder *string, endDate time.Ti
 		commits[i] = 0
 	}
 
-	for _, path := range repos {
+	for _, path := range folders {
 		commits, err = fillCommits(emailOrUsername, path, commits, endDate)
+		if err != nil {
+			// continue for other folders
+			colorize(Error, fmt.Sprintf("Error scanning folder repository %s: %s", path, err))
+			continue
+		}
 	}
 
-	return commits, err
+	return commits
 }
 
 // calcOffset determines and returns the amount of days missing to fill

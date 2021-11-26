@@ -12,6 +12,18 @@ import (
 	"strings"
 )
 
+// GetFolders returns all the folders needs to be scanned saved in dotfile
+func GetFolders() []string {
+	var repos []string
+	filePath := getDotFilePath()
+	repos = parseFileLinesToSlice(filePath)
+	if len(repos) == 0 || isRepo(".") {
+		repos = []string{"."}
+	}
+
+	return repos
+}
+
 // getDotFilePath returns the dot file for the repos list.
 // Creates it and the enclosing folder if it does not exist.
 func getDotFilePath() string {

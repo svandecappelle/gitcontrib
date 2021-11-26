@@ -70,7 +70,7 @@ func commands() []*cli.Command {
 			Aliases: []string{"s"},
 			Usage:   "Email: your@email.com - show constribution statistics of a user",
 			Action: func(c *cli.Context) error {
-				var folders []*string = make([]*string, 0)
+				var folders []string
 				var weeks *int = nil
 				var user *string = nil
 
@@ -84,7 +84,7 @@ func commands() []*cli.Command {
 					for argNum < c.NArg() {
 						arg := c.Args().Get(argNum)
 						if _, err := os.Stat(arg); err == nil {
-							folders = append(folders, &arg)
+							folders = append(folders, arg)
 						} else if errors.Is(err, os.ErrNotExist) {
 							user = &arg
 						}
@@ -100,11 +100,15 @@ func commands() []*cli.Command {
 				}
 
 				if len(folders) == 0 {
-					folders = []*string{nil}
+					folders = GetFolders()
 				}
 
-				for _, folder := range folders {
-					launchStats(*user, weeks, folder, c.String("delta"))
+				if c.Bool("merge") {
+					launchStats(*user, weeks, folders, c.String("delta"))
+				} else {
+					for _, folder := range folders {
+						launchStats(*user, weeks, []string{folder}, c.String("delta"))
+					}
 				}
 				return nil
 			},
@@ -119,12 +123,17 @@ func commands() []*cli.Command {
 					Value: -1,
 					Usage: "Number of weeks to compute",
 				},
+				&cli.BoolFlag{
+					Name:  "merge",
+					Value: false,
+					Usage: "Merge all scanned repository",
+				},
 			},
 		},
 	}
 }
 
-func launchStats(email string, durationInWeeks *int, folder *string, delta string) error {
+func launchStats(email string, durationInWeeks *int, folders []string, delta string) error {
 	width, _, _ := terminal.GetSize(0)
 	if durationInWeeks != nil {
 		if width < (4**durationInWeeks)+16 {
@@ -134,7 +143,7 @@ func launchStats(email string, durationInWeeks *int, folder *string, delta strin
 		defaultDuration := (width - 16) / 4
 		durationInWeeks = &defaultDuration
 	}
-	Stats(email, durationInWeeks, folder, delta)
+	Stats(email, durationInWeeks, folders, delta)
 	return nil
 }
 
