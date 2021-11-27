@@ -91,7 +91,7 @@ func commands() []*cli.Command {
 						argNum += 1
 					}
 				}
-				if user == nil {
+				if user == nil && !c.Bool("count-all") {
 					_, gitEmail, err := getUserFromGitConfig()
 					if err != nil {
 						panic(err)
@@ -104,10 +104,10 @@ func commands() []*cli.Command {
 				}
 
 				if c.Bool("merge") {
-					launchStats(*user, weeks, folders, c.String("delta"))
+					launchStats(user, weeks, folders, c.String("delta"))
 				} else {
 					for _, folder := range folders {
-						launchStats(*user, weeks, []string{folder}, c.String("delta"))
+						launchStats(user, weeks, []string{folder}, c.String("delta"))
 					}
 				}
 				return nil
@@ -128,12 +128,17 @@ func commands() []*cli.Command {
 					Value: false,
 					Usage: "Merge all scanned repository",
 				},
+				&cli.BoolFlag{
+					Name:  "count-all",
+					Value: false,
+					Usage: "Force count all users contributions",
+				},
 			},
 		},
 	}
 }
 
-func launchStats(email string, durationInWeeks *int, folders []string, delta string) error {
+func launchStats(email *string, durationInWeeks *int, folders []string, delta string) error {
 	width, _, _ := terminal.GetSize(0)
 	if durationInWeeks != nil {
 		if width < (4**durationInWeeks)+16 {

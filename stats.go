@@ -47,7 +47,7 @@ func isRepo(path string) bool {
 }
 
 // Stats calculates and prints the stats.
-func Stats(emailOrUsername string, durationParamInWeeks *int, folders []string, delta string) {
+func Stats(emailOrUsername *string, durationParamInWeeks *int, folders []string, delta string) {
 	colorize(Header, strings.Join(folders, ","))
 	fmt.Println()
 
@@ -99,7 +99,11 @@ func Stats(emailOrUsername string, durationParamInWeeks *int, folders []string, 
 	start := end
 	start = start.AddDate(0, 0, -*durationParamInWeeks*7)
 	fmt.Printf("Scanning for ")
-	colorize(Message, emailOrUsername)
+	if emailOrUsername != nil {
+		colorize(Message, *emailOrUsername)
+	} else {
+		colorize(Message, "all")
+	}
 	fmt.Printf(" contributions from ")
 	colorize(Message, fmt.Sprintf("%s", start))
 	fmt.Printf(" to ")
@@ -139,7 +143,7 @@ func countDaysSinceDate(date time.Time, end time.Time) int {
 
 // fillCommits given a repository found in `path`, gets the commits and
 // puts them in the `commits` map, returning it when completed
-func fillCommits(emailOrUsername string, path string, commits map[int]int, endDate time.Time) (map[int]int, error) {
+func fillCommits(emailOrUsername *string, path string, commits map[int]int, endDate time.Time) (map[int]int, error) {
 	// instantiate a git repo object from path
 	repo, err := git.PlainOpen(path)
 	if err != nil {
@@ -160,20 +164,28 @@ func fillCommits(emailOrUsername string, path string, commits map[int]int, endDa
 	offset := calcOffset(endDate)
 	err = iterator.ForEach(func(c *object.Commit) error {
 		daysAgo := countDaysSinceDate(c.Author.When, endDate) + offset
+		if daysAgo == outOfRange {
+			return nil
+		}
 
-		if strings.Contains(emailOrUsername, "@") {
-			if c.Author.Email != emailOrUsername {
-				return nil
+		if emailOrUsername != nil {
+			users := strings.Split(*emailOrUsername, ",")
+			var found bool
+			for _, u := range users {
+				if strings.Contains(u, "@") && c.Author.Email == u {
+					found = true
+					break
+				} else if c.Author.Name == u {
+					found = true
+					break
+				}
 			}
-		} else {
-			if c.Author.Name != emailOrUsername {
+			if !found {
 				return nil
 			}
 		}
 
-		if daysAgo != outOfRange {
-			commits[daysAgo]++
-		}
+		commits[daysAgo]++
 
 		return nil
 	})
@@ -186,7 +198,7 @@ func fillCommits(emailOrUsername string, path string, commits map[int]int, endDa
 
 // processRepositories given an user email, returns the
 // commits made in the last 6 months
-func processRepositories(emailOrUsername string, folders []string, endDate time.Time) map[int]int {
+func processRepositories(emailOrUsername *string, folders []string, endDate time.Time) map[int]int {
 	daysInMap := durationInDays
 
 	commits := make(map[int]int, daysInMap)
@@ -199,7 +211,7 @@ func processRepositories(emailOrUsername string, folders []string, endDate time.
 		commits, err = fillCommits(emailOrUsername, path, commits, endDate)
 		if err != nil {
 			// continue for other folders
-			colorize(Error, fmt.Sprintf("Error scanning folder repository %s: %s", path, err))
+			colorize(Error, fmt.Sprintf("Error scanning folder repository %s: %s\n", path, err))
 			continue
 		}
 	}
