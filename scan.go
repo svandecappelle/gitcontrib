@@ -102,17 +102,17 @@ func joinSlices(new []string, existing []string) []string {
 }
 
 // dumpStringsSliceToFile writes content to the file in path `filePath` (overwriting existing content)
-func dumpStringsSliceToFile(repos []string, filePath string) {
+func dumpStringsSliceToFile(repos []string, filePath string) error {
 	content := strings.Join(repos, "\n")
-	ioutil.WriteFile(filePath, []byte(content), 0755)
+	return ioutil.WriteFile(filePath, []byte(content), 0755)
 }
 
 // addNewSliceElementsToFile given a slice of strings representing paths, stores them
 // to the filesystem
-func addNewSliceElementsToFile(filePath string, newRepos []string) {
+func addNewSliceElementsToFile(filePath string, newRepos []string) error {
 	existingRepos := parseFileLinesToSlice(filePath)
 	repos := joinSlices(newRepos, existingRepos)
-	dumpStringsSliceToFile(repos, filePath)
+	return dumpStringsSliceToFile(repos, filePath)
 }
 
 // recursiveScanFolder starts the recursive search of git repositories
@@ -122,10 +122,10 @@ func recursiveScanFolder(folder string) []string {
 }
 
 // Scan scans a new folder for Git repositories
-func Scan(folder string) {
+func Scan(folder string) error {
 	repositories := recursiveScanFolder(folder)
 	filePath := getDotFilePath()
-	addNewSliceElementsToFile(filePath, repositories)
+	return addNewSliceElementsToFile(filePath, repositories)
 }
 
 // List list all repositories wich saved to scan

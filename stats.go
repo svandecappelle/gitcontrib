@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"sort"
@@ -8,10 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"gopkg.in/src-d/go-git.v4"
-	"gopkg.in/src-d/go-git.v4/plumbing/object"
-
 	"github.com/fatih/color"
+	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing/object"
 )
 
 const outOfRange = 99999
@@ -47,7 +47,7 @@ func isRepo(path string) bool {
 }
 
 // Stats calculates and prints the stats.
-func Stats(emailOrUsername *string, durationParamInWeeks *int, folders []string, delta string) {
+func Stats(emailOrUsername *string, durationParamInWeeks int, folders []string, delta string) error {
 	colorize(Header, strings.Join(folders, ","))
 	fmt.Println()
 
@@ -57,7 +57,7 @@ func Stats(emailOrUsername *string, durationParamInWeeks *int, folders []string,
 	case strings.Contains(delta, "y"):
 		value, err := strconv.Atoi(strings.Split(delta, "y")[0])
 		if err != nil {
-			panic("Error delta is not a number")
+			return errors.New("Error delta is not a number")
 		}
 		if value > 0 {
 			value = -value
@@ -66,7 +66,7 @@ func Stats(emailOrUsername *string, durationParamInWeeks *int, folders []string,
 	case strings.Contains(delta, "m"):
 		value, err := strconv.Atoi(strings.Split(delta, "m")[0])
 		if err != nil {
-			panic("Error delta is not a number")
+			return errors.New("Error delta is not a number")
 		}
 		if value > 0 {
 			value = -value
@@ -75,7 +75,7 @@ func Stats(emailOrUsername *string, durationParamInWeeks *int, folders []string,
 	case strings.Contains(delta, "w"):
 		value, err := strconv.Atoi(strings.Split(delta, "w")[0])
 		if err != nil {
-			panic("Error delta is not a number")
+			return errors.New("Error delta is not a number")
 		}
 		if value > 0 {
 			value = -value
@@ -84,7 +84,7 @@ func Stats(emailOrUsername *string, durationParamInWeeks *int, folders []string,
 	case strings.Contains(delta, "d"):
 		value, err := strconv.Atoi(strings.Split(delta, "d")[0])
 		if err != nil {
-			panic("Error delta is not a number")
+			return errors.New("Error delta is not a number")
 		}
 		if value > 0 {
 			value = -value
@@ -92,12 +92,12 @@ func Stats(emailOrUsername *string, durationParamInWeeks *int, folders []string,
 		end = nowDate.AddDate(0, 0, value)
 	}
 
-	if durationParamInWeeks != nil && *durationParamInWeeks > 0 {
-		durationInDays = *durationParamInWeeks * 7
-		durationInWeeks = *durationParamInWeeks
+	if durationParamInWeeks > 0 {
+		durationInDays = durationParamInWeeks * 7
+		durationInWeeks = durationParamInWeeks
 	}
 	start := end
-	start = start.AddDate(0, 0, -*durationParamInWeeks*7)
+	start = start.AddDate(0, 0, -durationParamInWeeks*7)
 	fmt.Printf("Scanning for ")
 	if emailOrUsername != nil {
 		colorize(Message, *emailOrUsername)
@@ -105,14 +105,15 @@ func Stats(emailOrUsername *string, durationParamInWeeks *int, folders []string,
 		colorize(Message, "all")
 	}
 	fmt.Printf(" contributions from ")
-	colorize(Message, fmt.Sprintf("%s", start))
+	colorize(Message, start.String())
 	fmt.Printf(" to ")
-	colorize(Message, fmt.Sprintf("%s", end))
+	colorize(Message, end.String())
 	fmt.Println()
 	fmt.Println()
 
-	commits := processRepositories(emailOrUsername, folders, end)
+	commits, err := processRepositories(emailOrUsername, folders, end)
 	printCommitsStats(commits, end)
+	return err
 }
 
 // getBeginningOfDay given a time.Time calculates the start time of that day
@@ -147,18 +148,16 @@ func fillCommits(emailOrUsername *string, path string, commits map[int]int, endD
 	// instantiate a git repo object from path
 	repo, err := git.PlainOpen(path)
 	if err != nil {
+		log.Fatalf("Cannot from opening repository: %s", path)
 		return commits, err
 	}
-	// get the HEAD reference
-	ref, err := repo.Head()
+	// Remove one day to end date to be sure parse today date
+	trueEndDateParse := endDate.AddDate(0, 0, 1)
+	// get the commits history until endDate is not reached
+	iterator, err := repo.Log(&git.LogOptions{Until: &trueEndDateParse})
 	if err != nil {
-		log.Fatalf("Cannot get HEAD from repository: %s", path)
+		log.Fatalf("Cannot get repository history: %s", err)
 		return commits, err
-	}
-	// get the commits history starting from HEAD
-	iterator, err := repo.Log(&git.LogOptions{From: ref.Hash()})
-	if err != nil {
-		return nil, err
 	}
 	// iterate the commits
 	offset := calcOffset(endDate)
@@ -190,7 +189,8 @@ func fillCommits(emailOrUsername *string, path string, commits map[int]int, endD
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		log.Fatalf("Error on git-log iterate: %s", err)
+		return commits, err
 	}
 
 	return commits, nil
@@ -198,25 +198,27 @@ func fillCommits(emailOrUsername *string, path string, commits map[int]int, endD
 
 // processRepositories given an user email, returns the
 // commits made in the last 6 months
-func processRepositories(emailOrUsername *string, folders []string, endDate time.Time) map[int]int {
+func processRepositories(emailOrUsername *string, folders []string, endDate time.Time) (map[int]int, error) {
 	daysInMap := durationInDays
 
 	commits := make(map[int]int, daysInMap)
-	var err error = nil
+	var errReturn error
 	for i := daysInMap; i > 0; i-- {
 		commits[i] = 0
 	}
 
 	for _, path := range folders {
+		var err error
 		commits, err = fillCommits(emailOrUsername, path, commits, endDate)
 		if err != nil {
 			// continue for other folders
 			colorize(Error, fmt.Sprintf("Error scanning folder repository %s: %s\n", path, err))
+			errReturn = err
 			continue
 		}
 	}
 
-	return commits
+	return commits, errReturn
 }
 
 // calcOffset determines and returns the amount of days missing to fill
@@ -380,5 +382,5 @@ func printDayCol(day int) {
 		out = " Fri "
 	}
 
-	fmt.Printf(out)
+	fmt.Print(out)
 }
