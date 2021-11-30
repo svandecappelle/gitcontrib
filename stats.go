@@ -16,8 +16,7 @@ import (
 
 const outOfRange = 99999
 
-var durationInDays = 365
-var durationInWeeks = 52
+var DefaultDurationInDays = 365
 
 type column []int
 
@@ -90,11 +89,14 @@ func Stats(emailOrUsername *string, durationParamInWeeks int, folders []string, 
 			value = -value
 		}
 		end = nowDate.AddDate(0, 0, value)
+	default:
+		if delta != "" {
+			return errors.New("Invalid delta value use the format: <int>[y/m/w/d]")
+		}
 	}
-
+	durationInDays := DefaultDurationInDays
 	if durationParamInWeeks > 0 {
 		durationInDays = durationParamInWeeks * 7
-		durationInWeeks = durationParamInWeeks
 	}
 	start := end
 	start = start.AddDate(0, 0, -durationParamInWeeks*7)
@@ -105,14 +107,14 @@ func Stats(emailOrUsername *string, durationParamInWeeks int, folders []string, 
 		colorize(Message, "all")
 	}
 	fmt.Printf(" contributions from ")
-	colorize(Message, start.String())
+	colorize(Message, start.Format("Mon 2006 Jan 01"))
 	fmt.Printf(" to ")
-	colorize(Message, end.String())
+	colorize(Message, end.Format("Mon 2006 Jan 01"))
 	fmt.Println()
 	fmt.Println()
 
-	commits, err := processRepositories(emailOrUsername, folders, end)
-	printCommitsStats(commits, end)
+	commits, err := processRepositories(emailOrUsername, folders, end, durationInDays)
+	printCommitsStats(commits, end, durationInDays)
 	return err
 }
 
@@ -124,7 +126,7 @@ func getBeginningOfDay(t time.Time) time.Time {
 }
 
 // countDaysSinceDate counts how many days passed since the passed `date`
-func countDaysSinceDate(date time.Time, end time.Time) int {
+func countDaysSinceDate(date time.Time, end time.Time, durationInDays int) int {
 	days := 0
 	endDate := getBeginningOfDay(end)
 	if !date.Before(endDate) && !date.Equal(endDate) {
@@ -144,12 +146,12 @@ func countDaysSinceDate(date time.Time, end time.Time) int {
 
 // fillCommits given a repository found in `path`, gets the commits and
 // puts them in the `commits` map, returning it when completed
-func fillCommits(emailOrUsername *string, path string, commits map[int]int, endDate time.Time) (map[int]int, error) {
+func fillCommits(emailOrUsername *string, path string, commits map[int]int, endDate time.Time, durationInDays int) (map[int]int, error) {
 	// instantiate a git repo object from path
 	repo, err := git.PlainOpen(path)
 	if err != nil {
-		log.Fatalf("Cannot from opening repository: %s", path)
-		return commits, err
+		// log.Fatalf("Cannot get stat from folder (not a repository): %s", path)
+		return commits, fmt.Errorf("Cannot get stat from folder (not a repository): %s", path)
 	}
 	// Remove one day to end date to be sure parse today date
 	trueEndDateParse := endDate.AddDate(0, 0, 1)
@@ -160,9 +162,9 @@ func fillCommits(emailOrUsername *string, path string, commits map[int]int, endD
 		return commits, err
 	}
 	// iterate the commits
-	offset := calcOffset(endDate)
+	offset := calcOffset(trueEndDateParse)
 	err = iterator.ForEach(func(c *object.Commit) error {
-		daysAgo := countDaysSinceDate(c.Author.When, endDate) + offset
+		daysAgo := countDaysSinceDate(c.Author.When, endDate, durationInDays) + offset
 		if daysAgo == outOfRange {
 			return nil
 		}
@@ -184,7 +186,9 @@ func fillCommits(emailOrUsername *string, path string, commits map[int]int, endD
 			}
 		}
 
-		commits[daysAgo]++
+		if daysAgo <= durationInDays {
+			commits[daysAgo]++
+		}
 
 		return nil
 	})
@@ -198,7 +202,7 @@ func fillCommits(emailOrUsername *string, path string, commits map[int]int, endD
 
 // processRepositories given an user email, returns the
 // commits made in the last 6 months
-func processRepositories(emailOrUsername *string, folders []string, endDate time.Time) (map[int]int, error) {
+func processRepositories(emailOrUsername *string, folders []string, endDate time.Time, durationInDays int) (map[int]int, error) {
 	daysInMap := durationInDays
 
 	commits := make(map[int]int, daysInMap)
@@ -209,7 +213,7 @@ func processRepositories(emailOrUsername *string, folders []string, endDate time
 
 	for _, path := range folders {
 		var err error
-		commits, err = fillCommits(emailOrUsername, path, commits, endDate)
+		commits, err = fillCommits(emailOrUsername, path, commits, endDate, durationInDays)
 		if err != nil {
 			// continue for other folders
 			colorize(Error, fmt.Sprintf("Error scanning folder repository %s: %s\n", path, err))
@@ -217,7 +221,6 @@ func processRepositories(emailOrUsername *string, folders []string, endDate time
 			continue
 		}
 	}
-
 	return commits, errReturn
 }
 
@@ -279,10 +282,10 @@ func printCell(val int, today bool) {
 }
 
 // printCommitsStats prints the commits stats
-func printCommitsStats(commits map[int]int, endDate time.Time) {
+func printCommitsStats(commits map[int]int, endDate time.Time, durationInDays int) {
 	keys := sortMapIntoSlice(commits)
 	cols := buildCols(keys, commits)
-	printCells(cols, endDate)
+	printCells(cols, endDate, durationInDays)
 }
 
 // sortMapIntoSlice returns a slice of indexes of a map, ordered
@@ -322,8 +325,9 @@ func buildCols(keys []int, commits map[int]int) map[int]column {
 }
 
 // printCells prints the cells of the graph
-func printCells(cols map[int]column, endDate time.Time) {
-	printMonths(endDate)
+func printCells(cols map[int]column, endDate time.Time, durationInDays int) {
+	printMonths(endDate, durationInDays)
+	durationInWeeks := durationInDays / 7
 	for j := 6; j >= 0; j-- {
 		for i := durationInWeeks + 1; i >= 0; i-- {
 			if i == durationInWeeks+1 {
@@ -349,7 +353,7 @@ func printCells(cols map[int]column, endDate time.Time) {
 
 // printMonths prints the month names in the first line, determining when the month
 // changed between switching weeks
-func printMonths(endDate time.Time) {
+func printMonths(endDate time.Time, durationInDays int) {
 	week := getBeginningOfDay(endDate).Add(-(time.Duration(durationInDays) * time.Hour * 24))
 	month := week.Month()
 	fmt.Printf("         ")
