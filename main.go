@@ -10,10 +10,9 @@ import (
 	"path/filepath"
 	"time"
 
-	"golang.org/x/crypto/ssh/terminal"
-
 	"github.com/muja/goconfig"
 	"github.com/urfave/cli/v2"
+	"golang.org/x/term"
 )
 
 func getUserFromGitConfig() (*string, *string, error) {
@@ -25,7 +24,7 @@ func getUserFromGitConfig() (*string, *string, error) {
 	config, _, err := goconfig.Parse(bytes)
 	if err != nil {
 		// Note: config is non-nil and contains successfully parsed values
-		log.Fatalf("Error on line %d: %v.\n", err)
+		log.Fatalf("Error on git config file: %s\n", err)
 		return nil, nil, err
 	}
 	username := config["user.name"]
@@ -45,7 +44,10 @@ func commands() []*cli.Command {
 					for argNum < c.NArg() {
 						arg := c.Args().Get(argNum)
 						if _, err := os.Stat(arg); err == nil {
-							addToScan(arg)
+							err := addToScan(arg)
+							if err != nil {
+								return err
+							}
 						} else if errors.Is(err, os.ErrNotExist) {
 							fmt.Printf("Repository %s does not exists\n", arg)
 						}
@@ -68,7 +70,7 @@ func commands() []*cli.Command {
 		&cli.Command{
 			Name:    "stat",
 			Aliases: []string{"s"},
-			Usage:   "Email: your@email.com - show constribution statistics of a user",
+			Usage:   "Email or Name: your@email.com / 'Firstname Name' - show constribution statistics of a user",
 			Action: func(c *cli.Context) error {
 				var folders []string
 				var weeks *int = nil
@@ -102,15 +104,18 @@ func commands() []*cli.Command {
 				if len(folders) == 0 {
 					folders = GetFolders()
 				}
-
+				var err error
 				if c.Bool("merge") {
-					launchStats(user, weeks, folders, c.String("delta"))
+					err = launchStats(user, weeks, folders, c.String("delta"))
 				} else {
 					for _, folder := range folders {
-						launchStats(user, weeks, []string{folder}, c.String("delta"))
+						curErr := launchStats(user, weeks, []string{folder}, c.String("delta"))
+						if err == nil {
+							err = curErr
+						}
 					}
 				}
-				return nil
+				return err
 			},
 			Flags: []cli.Flag{
 				&cli.StringFlag{
@@ -139,7 +144,7 @@ func commands() []*cli.Command {
 }
 
 func launchStats(email *string, durationInWeeks *int, folders []string, delta string) error {
-	width, _, _ := terminal.GetSize(0)
+	width, _, _ := term.GetSize(0)
 	if durationInWeeks != nil {
 		if width < (4**durationInWeeks)+16 {
 			return errors.New("Too much data to display in this terminal width")
@@ -148,12 +153,11 @@ func launchStats(email *string, durationInWeeks *int, folders []string, delta st
 		defaultDuration := (width - 16) / 4
 		durationInWeeks = &defaultDuration
 	}
-	Stats(email, durationInWeeks, folders, delta)
-	return nil
+	return Stats(email, *durationInWeeks, folders, delta)
 }
 
-func addToScan(folder string) {
-	Scan(folder)
+func addToScan(folder string) error {
+	return Scan(folder)
 }
 
 func main() {
