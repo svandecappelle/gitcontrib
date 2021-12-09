@@ -63,8 +63,7 @@ func commands() []*cli.Command {
 			Aliases: []string{"lr"},
 			Usage:   "List repositories to scan for statistic",
 			Action: func(c *cli.Context) error {
-				List()
-				return nil
+				return List()
 			},
 		},
 		&cli.Command{
@@ -75,6 +74,7 @@ func commands() []*cli.Command {
 				var folders []string
 				var weeks *int = nil
 				var user *string = nil
+				var err error
 
 				if c.Int("weeks") > 0 {
 					weeksParam := c.Int("weeks")
@@ -102,9 +102,11 @@ func commands() []*cli.Command {
 				}
 
 				if len(folders) == 0 {
-					folders = GetFolders()
+					folders, err = GetFolders()
+					if err != nil {
+						return err
+					}
 				}
-				var err error
 				if c.Bool("merge") {
 					err = launchStats(user, weeks, folders, c.String("delta"))
 				} else {

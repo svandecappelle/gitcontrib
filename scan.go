@@ -13,28 +13,32 @@ import (
 )
 
 // GetFolders returns all the folders needs to be scanned saved in dotfile
-func GetFolders() []string {
+func GetFolders() ([]string, error) {
 	var repos []string
-	filePath := getDotFilePath()
-	repos = parseFileLinesToSlice(filePath)
+	filePath, err := getDotFilePath()
+	if err != nil {
+		return []string{}, err
+	}
+	repos = parseFileLinesToSlice(*filePath)
 	if len(repos) == 0 || isRepo(".") {
 		repos = []string{"."}
 	}
 
-	return repos
+	return repos, nil
 }
 
 // getDotFilePath returns the dot file for the repos list.
 // Creates it and the enclosing folder if it does not exist.
-func getDotFilePath() string {
+func getDotFilePath() (*string, error) {
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
+		return nil, err
 	}
 
 	dotFile := usr.HomeDir + "/.gogitstats"
 
-	return dotFile
+	return &dotFile, nil
 }
 
 // openFile opens the file located at `filePath`. Creates it if not existing.
@@ -117,25 +121,35 @@ func addNewSliceElementsToFile(filePath string, newRepos []string) error {
 
 // recursiveScanFolder starts the recursive search of git repositories
 // living in the `folder` subtree
-func recursiveScanFolder(folder string) []string {
+func recursiveScanFolder(folder string) ([]string, error) {
 	return scanGitFolders(make([]string, 0), folder)
 }
 
 // Scan scans a new folder for Git repositories
 func Scan(folder string) error {
-	repositories := recursiveScanFolder(folder)
-	filePath := getDotFilePath()
-	return addNewSliceElementsToFile(filePath, repositories)
+	repositories, err := recursiveScanFolder(folder)
+	if err != nil {
+		return err
+	}
+	filePath, err := getDotFilePath()
+	if err != nil {
+		return err
+	}
+	return addNewSliceElementsToFile(*filePath, repositories)
 }
 
 // List list all repositories wich saved to scan
-func List() {
-	configFilePath := getDotFilePath()
-	repositories := parseFileLinesToSlice(configFilePath)
+func List() error {
+	configFilePath, err := getDotFilePath()
+	if err != nil {
+		return err
+	}
+	repositories := parseFileLinesToSlice(*configFilePath)
 	fmt.Printf("Git folders:\n\n")
 	for _, repository := range repositories {
 		fmt.Printf("- %s\n", repository)
 	}
+	return nil
 }
 
 func shouldBeIgnored(folderName string) bool {
@@ -145,25 +159,27 @@ func shouldBeIgnored(folderName string) bool {
 // scanGitFolders returns a list of subfolders of `folder` ending with `.git`.
 // Returns the base folder of the repo, the .git folder parent.
 // Recursively searches in the subfolders by passing an existing `folders` slice.
-func scanGitFolders(folders []string, folder string) []string {
+func scanGitFolders(folders []string, folder string) ([]string, error) {
 	// trim the last `/`
 	folder = strings.TrimSuffix(folder, "/")
 
 	f, err := os.Open(folder)
 	if err != nil {
 		log.Fatal(err)
+		return folders, err
 	}
 
 	pathFrom, err := os.Getwd()
 	if err != nil {
 		log.Fatal(err)
-		return folders
+		return folders, err
 	}
 	pathFrom = filepath.Join(pathFrom, folder)
 	files, err := f.Readdir(-1)
 	f.Close()
 	if err != nil {
 		log.Fatal(err)
+		return folders, err
 	}
 	for _, file := range files {
 		if file.IsDir() {
@@ -178,9 +194,12 @@ func scanGitFolders(folders []string, folder string) []string {
 			if shouldBeIgnored(file.Name()) {
 				continue
 			}
-			folders = scanGitFolders(folders, pathRelative)
+			folders, err = scanGitFolders(folders, pathRelative)
+			if err != nil {
+				return folders, err
+			}
 		}
 	}
 
-	return folders
+	return folders, nil
 }
