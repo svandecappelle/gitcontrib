@@ -1,4 +1,4 @@
-package main
+package stats
 
 import (
 	"testing"
@@ -11,7 +11,7 @@ func TestAddRepoToScanFromFolder(tt *testing.T) {
 	folders, err := GetFolders()
 	t.CmpNoError(err)
 	t.Cmp(folders, td.Len(1))
-	t.Cmp(folders[0], ".")
+	t.Cmp(folders[0], "..")
 }
 
 func TestUserDotFile(tt *testing.T) {
@@ -41,7 +41,7 @@ func TestListReposNoConfig(tt *testing.T) {
 func TestLunchStatsNoConfig(tt *testing.T) {
 	t := td.NewT(tt)
 
-	folders, err := scanGitFolders([]string{}, ".")
+	folders, err := scanGitFolders([]string{}, "..")
 	t.CmpNoError(err)
 	t.Cmp(folders, td.Len(1))
 }
