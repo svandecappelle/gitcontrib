@@ -175,6 +175,7 @@ func argParse(c *cli.Context, useDashboard bool) error {
 		if width < (4**weeks)+16 && !useDashboard {
 			return errors.New("too much data to display in this terminal width")
 		}
+		durationInWeeks = *weeks
 	} else {
 		defaultDuration := (width - 16) / 4
 		durationInWeeks = defaultDuration

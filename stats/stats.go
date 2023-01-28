@@ -29,13 +29,16 @@ type LaunchOptions struct {
 }
 
 type StatsResult struct {
-	Options        StatsOptions
-	BeginOfScan    time.Time
-	EndOfScan      time.Time
-	DurationInDays int
-	Folder         string
-	Commits        map[int]int
-	error          error
+	Options         StatsOptions
+	BeginOfScan     time.Time
+	EndOfScan       time.Time
+	DurationInDays  int
+	Folder          string
+	Commits         map[int]int
+	HoursCommits    [24]int
+	DayCommits      [7]int
+	AuthorsEditions map[string]map[string]int
+	error           error
 }
 
 type StatsOptions struct {
@@ -247,7 +250,7 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string) error {
 	// Remove one day to end date to be sure parse today date
 	// trueEndDateParse := endDate.AddDate(0, 0, 1)
 	// get the commits history until endDate is not reached
-	iterator, err := repo.Log(&git.LogOptions{Until: &r.EndOfScan})
+	iterator, err := repo.Log(&git.LogOptions{Since: &r.BeginOfScan, Until: &r.EndOfScan})
 	if err != nil {
 		log.Fatalf("Cannot get repository history: %s", err)
 		return err
@@ -256,6 +259,8 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string) error {
 	offset := calcOffset(r.EndOfScan)
 	err = iterator.ForEach(func(c *object.Commit) error {
 		daysAgo := countDaysSinceDate(c.Author.When, r) + offset
+		hour := c.Author.When.Hour()
+		day := c.Author.When.Weekday() - 1
 		if daysAgo == outOfRange {
 			return nil
 		}
@@ -277,8 +282,21 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string) error {
 			}
 		}
 
+		// TODO find a solution for improve perf
+		stats, _ := c.Stats()
+		for _, stat := range stats {
+			// fmt.Printf("+%d, -%d %s", stat.Addition, stat.Deletion, stat.Name)
+			if r.AuthorsEditions[c.Author.Name] == nil {
+				r.AuthorsEditions[c.Author.Name] = make(map[string]int, 2)
+			}
+			r.AuthorsEditions[c.Author.Name]["additions"] = r.AuthorsEditions[c.Author.Name]["additions"] + stat.Addition
+			r.AuthorsEditions[c.Author.Name]["deletions"] = r.AuthorsEditions[c.Author.Name]["deletions"] + stat.Deletion
+		}
+
 		if daysAgo <= r.DurationInDays {
 			r.Commits[daysAgo] = r.Commits[daysAgo] + 1
+			r.HoursCommits[hour] = r.HoursCommits[hour] + 1
+			r.DayCommits[day] = r.DayCommits[day] + 1
 		}
 
 		return nil
@@ -297,6 +315,7 @@ func processRepositories(r *StatsResult, emailOrUsername *string, folders []stri
 	daysInMap := r.DurationInDays
 
 	r.Commits = make(map[int]int, daysInMap)
+	r.AuthorsEditions = make(map[string]map[string]int)
 	var errReturn error
 	for i := daysInMap; i > 0; i-- {
 		r.Commits[i] = 0
