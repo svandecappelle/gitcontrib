@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing/object"
+	"github.com/schollz/progressbar/v3"
 )
 
 const outOfRange = 99999
@@ -38,7 +39,7 @@ type StatsResult struct {
 	HoursCommits    [24]int
 	DayCommits      [7]int
 	AuthorsEditions map[string]map[string]int
-	error           error
+	Error           error
 }
 
 type StatsOptions struct {
@@ -59,6 +60,7 @@ func isRepo(path string) bool {
 func Launch(opts LaunchOptions) []*StatsResult {
 	var results []*StatsResult = []*StatsResult{}
 	var wg sync.WaitGroup
+	bar := progressbar.Default(-1, "Analyzing commits")
 
 	if opts.Merge {
 		options := StatsOptions{
@@ -73,9 +75,10 @@ func Launch(opts LaunchOptions) []*StatsResult {
 			Options: options,
 		}
 		populateDurationInDays(opts, r)
+
 		results = append(results, r)
 		wg.Add(1)
-		go Stats(r, &wg)
+		go Stats(r, &wg, bar)
 	} else {
 		for _, folder := range opts.Folders {
 			options := StatsOptions{
@@ -91,7 +94,7 @@ func Launch(opts LaunchOptions) []*StatsResult {
 			populateDurationInDays(opts, r)
 			results = append(results, r)
 			wg.Add(1)
-			go Stats(r, &wg)
+			go Stats(r, &wg, bar)
 		}
 	}
 	wg.Wait()
@@ -123,7 +126,7 @@ func PrintResult(r *StatsResult) {
 	Print(Message, end.Format(time.RFC1123))
 	fmt.Println()
 	fmt.Println()
-	StatsResultConsolePrinter{Console}.print(r)
+	StatsResultConsolePrinter{Console}.print(r, -1)
 }
 
 func populateDurationInDays(options LaunchOptions, r *StatsResult) {
@@ -135,7 +138,7 @@ func populateDurationInDays(options LaunchOptions, r *StatsResult) {
 	case strings.Contains(delta, "y"):
 		value, err := strconv.Atoi(strings.Split(delta, "y")[0])
 		if err != nil {
-			r.error = errors.New("error delta is not a number")
+			r.Error = errors.New("error delta is not a number")
 			return
 		}
 		if value > 0 {
@@ -145,7 +148,7 @@ func populateDurationInDays(options LaunchOptions, r *StatsResult) {
 	case strings.Contains(delta, "m"):
 		value, err := strconv.Atoi(strings.Split(delta, "m")[0])
 		if err != nil {
-			r.error = errors.New("error delta is not a number")
+			r.Error = errors.New("error delta is not a number")
 			return
 		}
 		if value > 0 {
@@ -155,7 +158,7 @@ func populateDurationInDays(options LaunchOptions, r *StatsResult) {
 	case strings.Contains(delta, "w"):
 		value, err := strconv.Atoi(strings.Split(delta, "w")[0])
 		if err != nil {
-			r.error = errors.New("error delta is not a number")
+			r.Error = errors.New("error delta is not a number")
 			return
 		}
 		if value > 0 {
@@ -165,7 +168,7 @@ func populateDurationInDays(options LaunchOptions, r *StatsResult) {
 	case strings.Contains(delta, "d"):
 		value, err := strconv.Atoi(strings.Split(delta, "d")[0])
 		if err != nil {
-			r.error = errors.New("error delta is not a number")
+			r.Error = errors.New("error delta is not a number")
 			return
 		}
 		if value > 0 {
@@ -174,7 +177,7 @@ func populateDurationInDays(options LaunchOptions, r *StatsResult) {
 		end = nowDate.AddDate(0, 0, value)
 	default:
 		if delta != "" {
-			r.error = errors.New("invalid delta value use the format: <int>[y/m/w/d]")
+			r.Error = errors.New("invalid delta value use the format: <int>[y/m/w/d]")
 			return
 		}
 	}
@@ -188,17 +191,17 @@ func populateDurationInDays(options LaunchOptions, r *StatsResult) {
 }
 
 // Stats calculates and prints the stats.
-func Stats(r *StatsResult, wg *sync.WaitGroup) {
+func Stats(r *StatsResult, wg *sync.WaitGroup, bar *progressbar.ProgressBar) {
 	defer wg.Done()
 	o := r.Options
 	if !o.Silent {
 		Print(Header, strings.Join(o.Folders, ","))
 		fmt.Println()
 	}
-	err := processRepositories(r, o.EmailOrUsername, o.Folders)
+	err := processRepositories(r, bar)
 
 	if err != nil {
-		r.error = err
+		r.Error = err
 		return
 	}
 
@@ -240,7 +243,7 @@ func countDaysSinceDate(date time.Time, r *StatsResult) int {
 
 // fillCommits given a repository found in `path`, gets the commits and
 // puts them in the `commits` map, returning it when completed
-func fillCommits(r *StatsResult, emailOrUsername *string, path string) error {
+func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *progressbar.ProgressBar) error {
 	// instantiate a git repo object from path
 	repo, err := git.PlainOpen(path)
 	if err != nil {
@@ -260,7 +263,7 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string) error {
 	err = iterator.ForEach(func(c *object.Commit) error {
 		daysAgo := countDaysSinceDate(c.Author.When, r) + offset
 		hour := c.Author.When.Hour()
-		day := c.Author.When.Weekday() - 1
+		day := int(c.Author.When.Weekday())
 		if daysAgo == outOfRange {
 			return nil
 		}
@@ -298,7 +301,7 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string) error {
 			r.HoursCommits[hour] = r.HoursCommits[hour] + 1
 			r.DayCommits[day] = r.DayCommits[day] + 1
 		}
-
+		_ = bar.Add(1)
 		return nil
 	})
 	if err != nil {
@@ -311,7 +314,7 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string) error {
 
 // processRepositories given an user email, returns the
 // commits made in the last 6 months
-func processRepositories(r *StatsResult, emailOrUsername *string, folders []string) error {
+func processRepositories(r *StatsResult, bar *progressbar.ProgressBar) error {
 	daysInMap := r.DurationInDays
 
 	r.Commits = make(map[int]int, daysInMap)
@@ -321,9 +324,8 @@ func processRepositories(r *StatsResult, emailOrUsername *string, folders []stri
 		r.Commits[i] = 0
 	}
 
-	for _, path := range folders {
-		var err error
-		err = fillCommits(r, emailOrUsername, path)
+	for _, path := range r.Options.Folders {
+		err := fillCommits(r, r.Options.EmailOrUsername, path, bar)
 		if err != nil {
 			// continue for other folders
 			Print(Error, fmt.Sprintf("Error scanning folder repository %s: %s\n", path, err))

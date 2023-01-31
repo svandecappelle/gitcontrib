@@ -3,6 +3,7 @@ package stats
 import (
 	"fmt"
 	"log"
+	"math"
 	"strconv"
 
 	ui "github.com/gizak/termui/v3"
@@ -13,13 +14,13 @@ import (
 func OpenDashboard(opts LaunchOptions) {
 	folders, _ := GetFolders()
 	results := []string{}
-	width, _, _ := term.GetSize(0)
+	width, height, _ := term.GetSize(0)
 
 	rLaunch := Launch(opts)
 	output := ""
 	nbCommits := 0
 	for _, r := range rLaunch {
-		line := fmt.Sprintf("%s:\n%d", r.Folder, len(r.Commits))
+		line := fmt.Sprintf("%s: %d", r.Folder, len(r.Commits))
 		for _, commit := range r.Commits {
 			// calculate week day
 			nbCommits += commit
@@ -46,7 +47,7 @@ func OpenDashboard(opts LaunchOptions) {
 		fmt.Sprintf("Analyzed repos: %d", len(folders)),
 		fmt.Sprintf("User analyzed: %s", user),
 	}
-	p.SetRect(0, 0, width/3, 15)
+	p.SetRect(0, 0, width/3, height/3)
 
 	ui.Render(p)
 
@@ -57,12 +58,11 @@ func OpenDashboard(opts LaunchOptions) {
 
 	bc := widgets.NewBarChart()
 	bc.Title = "Commits on weekday"
-	bc.SetRect(0, 15, width/3, 35)
+	bc.SetRect(0, height*2/3, width/4, height)
 	bc.Labels = []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
+	bc.BarGap = 0
 	bc.Data = daysData
-	bc.BarWidth = int(width / 8 / 3)
-	// bc.BarColors[0] = ui.ColorGreen
-	// bc.NumStyles[0] = ui.NewStyle(ui.ColorBlack)
+	bc.BarWidth = int(width / 7 / 4)
 	ui.Render(bc)
 
 	var hoursData []float64
@@ -71,29 +71,74 @@ func OpenDashboard(opts LaunchOptions) {
 		hoursData = append(hoursData, float64(v))
 		hoursLabels = append(hoursLabels, strconv.Itoa(i+1))
 	}
-	// hours.Labels = []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
 
 	hoursGraph := widgets.NewBarChart()
 	hoursGraph.Title = "Commits on daytime"
-	hoursGraph.SetRect(width/3, 0, width, 15)
+	hoursGraph.SetRect(0, height/3, width, height*2/3)
+	hoursGraph.BarWidth = int(width / 12 / 2)
 	hoursGraph.Data = hoursData
 	hoursGraph.Labels = hoursLabels
+	hoursGraph.BarGap = 0
 	ui.Render(hoursGraph)
 
 	contribs := []string{}
+	contributorsMap := make(map[int]string)
+	allContributions := make([]float64, len(rLaunch[0].AuthorsEditions))
+	i := 0
+	colors := []string{"red", "green", "yellow", "blue", "magenta", "cyan", "white"}
 	for author, c := range rLaunch[0].AuthorsEditions {
-		contribs = append(contribs, fmt.Sprintf("%s: +%d:-%d", author, c["additions"], c["deletions"]))
+		contribs = append(
+			contribs,
+			fmt.Sprintf(
+				"[%s](fg:%s): [+%d](fg:green):[-%d](fg:red)",
+				author,
+				colors[i%len(colors)],
+				c["additions"],
+				c["deletions"],
+			),
+		)
+		allContributions[i] = float64(c["additions"] + c["deletions"])
+		contributorsMap[i] = author
+		i += 1
 	}
 	contributors := widgets.NewList()
 	contributors.Title = "Contributors"
 	contributors.Rows = contribs
-	contributors.SetRect(0, 45, width/3, 35)
-
+	contributors.SetRect(width/3, 0, width/3*2, height/3)
 	ui.Render(contributors)
 
-	for e := range ui.PollEvents() {
-		if e.Type == ui.KeyboardEvent {
-			break
+	contribGraph := widgets.NewPieChart()
+	contribGraph.Title = "Committers"
+	contribGraph.Data = allContributions
+	contribGraph.AngleOffset = -.5 * math.Pi
+	contribGraph.LabelFormatter = func(i int, v float64) string {
+		return fmt.Sprintf("%d", int(v))
+	}
+	contribGraph.SetRect(width/3*2, 0, width, height/3)
+	ui.Render(contribGraph)
+
+	foldersStats := widgets.NewList()
+	foldersStats.Title = "Repositories"
+	foldersStats.Rows = results
+	foldersStats.SetRect(width/4, height/3*2, width/2, height)
+	ui.Render(foldersStats)
+
+	heatmap := widgets.NewParagraph()
+	heatmap.Title = "Heatmap"
+	heatmap.SetRect(width/2, height/3*2, width, height)
+	// truncate data
+	defaultDurationTruncated := (width - 12) / 9
+	if defaultDurationTruncated > rLaunch[0].Options.DurationParamInWeeks {
+		defaultDurationTruncated = rLaunch[0].Options.DurationParamInWeeks
+	}
+	heatmap.Text = StatsResultConsolePrinter{Dashboard}.print(rLaunch[0], defaultDurationTruncated)
+	ui.Render(heatmap)
+
+	uiEvents := ui.PollEvents()
+	for e := range uiEvents {
+		switch e.ID {
+		case "q", "<C-c>":
+			return
 		}
 	}
 }

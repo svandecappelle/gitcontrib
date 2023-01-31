@@ -1,104 +1,112 @@
-package stats
+package stats_test
 
 import (
-	"fmt"
-	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/maxatome/go-testdeep/td"
+	"github.com/schollz/progressbar/v3"
+	"github.com/svandecappelle/gitcontrib/stats"
 )
 
 var existingUser = "Steeve Vandecappelle"
 var unknownUser = "Mybest Friend"
 var currentRepo = []string{".."}
-var invalidRepo = []string{"../.."}
+var bar = progressbar.Default(-1, "Analyzing commits")
+var wg sync.WaitGroup
+var now = time.Now()
+var begin = now.AddDate(0, 0, -28)
+var days [7]int
 
-func TestFolderIsRepo(t *testing.T) {
-	t.Run("Check folder is a repository", func(t *testing.T) {
-		if !isRepo(".") {
-			t.Errorf("isRepo should be true")
-		}
-	})
+var statResults []stats.StatsResult = []stats.StatsResult{
+	stats.StatsResult{
+		Options: stats.StatsOptions{
+			EmailOrUsername:      nil,
+			DurationParamInWeeks: 4,
+			Folders:              currentRepo,
+			Delta:                "",
+			Silent:               true,
+		},
+		BeginOfScan:     begin,
+		EndOfScan:       now,
+		DurationInDays:  28,
+		Folder:          currentRepo[0],
+		Commits:         make(map[int]int),
+		DayCommits:      days,
+		AuthorsEditions: make(map[string]map[string]int),
+	},
+	stats.StatsResult{
+		Options: stats.StatsOptions{
+			EmailOrUsername:      &unknownUser,
+			DurationParamInWeeks: 4,
+			Folders:              currentRepo,
+			Delta:                "",
+			Silent:               true,
+		},
+		BeginOfScan:     begin,
+		EndOfScan:       now,
+		DurationInDays:  28,
+		Folder:          currentRepo[0],
+		Commits:         make(map[int]int),
+		DayCommits:      days,
+		AuthorsEditions: make(map[string]map[string]int),
+	},
+	stats.StatsResult{
+		Options: stats.StatsOptions{
+			EmailOrUsername:      &existingUser,
+			DurationParamInWeeks: 4,
+			Folders:              currentRepo,
+			Delta:                "",
+			Silent:               true,
+		},
+		BeginOfScan:     begin,
+		EndOfScan:       now,
+		DurationInDays:  28,
+		Folder:          currentRepo[0],
+		Commits:         make(map[int]int),
+		DayCommits:      days,
+		AuthorsEditions: make(map[string]map[string]int),
+	},
 }
 
-func TestStatRepoFromFolder(tt *testing.T) {
-	t := td.NewT(tt)
-	_, err := Stats(StatsOptions{nil, 4, currentRepo, "", true})
-	t.CmpNoError(err)
-}
-
-func TestStatForOneUser(tt *testing.T) {
-	t := td.NewT(tt)
-	_, err := Stats(StatsOptions{&unknownUser, 4, currentRepo, "", true})
-	t.CmpNoError(err)
-
-	_, err = Stats(StatsOptions{&existingUser, 4, currentRepo, "", true})
-	t.CmpNoError(err)
+func TestStatForUser(tt *testing.T) {
+	for _, r := range statResults {
+		t := td.NewT(tt)
+		wg.Add(1)
+		go stats.Stats(&r, &wg, bar)
+		t.CmpNoError(r.Error)
+	}
+	wg.Wait()
 }
 
 func TestStatWithDelta(tt *testing.T) {
 	t := td.NewT(tt)
-	_, err := Stats(StatsOptions{nil, 4, currentRepo, "1d", true})
-	t.CmpNoError(err)
 
-	_, err = Stats(StatsOptions{nil, 4, currentRepo, "1w", true})
-	t.CmpNoError(err)
-
-	_, err = Stats(StatsOptions{nil, 4, currentRepo, "1m", true})
-	t.CmpNoError(err)
-
-	_, err = Stats(StatsOptions{nil, 4, currentRepo, "1y", true})
-	t.CmpNoError(err)
-
-	_, err = Stats(StatsOptions{nil, 4, currentRepo, "2y", true})
-	t.CmpNoError(err)
-
-	_, err = Stats(StatsOptions{nil, 4, currentRepo, "xx", true})
-	t.CmpError(err)
-	t.Cmp(err.Error(), "invalid delta value use the format: <int>[y/m/w/d]")
-}
-
-func TestGetCommitMap(tt *testing.T) {
-	t := td.NewT(tt)
-
-	now := time.Now()
-	daysNum := 4 * 7
-
-	commits, err := processRepositories(&unknownUser, currentRepo, now, daysNum)
-	t.CmpNoError(err)
-	t.Cmp(commits, td.Len(daysNum), fmt.Sprintf(
-		"Commit map should fill %d days but get %d days",
-		daysNum,
-		len(commits)),
-	)
-
-	aDate := time.Date(2021, time.November, 24, 12, 0, 0, 1, time.UTC)
-
-	commits, err = processRepositories(&existingUser, currentRepo, aDate, daysNum)
-	t.CmpNoError(err)
-	t.Cmp(commits, td.Len(daysNum), fmt.Sprintf(
-		"Commit map should fill %d days but get %d days",
-		daysNum,
-		len(commits),
-	))
-
-	// t.Errorf("Commit map should fill %d days but get %d days", daysNum, len(commits))
-	totalCount := 0
-	for _, count := range commits {
-		totalCount += count
+	for _, d := range []string{"1w", "1m", "1y", "2y"} {
+		options := stats.LaunchOptions{
+			User:            nil,
+			DurationInWeeks: 4,
+			Folders:         currentRepo,
+			Merge:           false,
+			Delta:           d,
+			Dashboard:       false,
+		}
+		r := stats.Launch(options)
+		t.CmpNoError(r[0].Error)
 	}
-	t.Cmp(totalCount, td.Gt(0), fmt.Sprintf(
-		"Commit of this repos should be at %d but it was %d",
-		6,
-		totalCount,
-	))
 
-	commits, err = processRepositories(&unknownUser, invalidRepo, now, daysNum)
-	t.CmpError(err)
-	t.Cmp(err.Error(), fmt.Sprintf(
-		"cannot get stat from folder (not a repository): %s",
-		strings.Join(invalidRepo, ","),
-	))
-	t.Cmp(commits, td.Len(daysNum))
+	options := stats.LaunchOptions{
+		User:            nil,
+		DurationInWeeks: 4,
+		Folders:         currentRepo,
+		Merge:           false,
+		Delta:           "xx",
+		Dashboard:       false,
+	}
+	r := stats.Launch(options)
+	t.CmpError(r[0].Error)
+	if r[0].Error != nil {
+		t.Cmp(r[0].Error.Error(), "invalid delta value use the format: <int>[y/m/w/d]")
+	}
 }

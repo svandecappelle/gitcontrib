@@ -17,7 +17,7 @@ type OutputType int64
 
 const (
 	Console   OutputType = 0
-	Dashboard            = 1
+	Dashboard OutputType = 1
 )
 
 var (
@@ -35,18 +35,20 @@ type StatsResultConsolePrinter struct {
 	OutputType OutputType
 }
 
-func (p StatsResultConsolePrinter) print(r *StatsResult) {
+func (p StatsResultConsolePrinter) print(r *StatsResult, limitWeeks int) string {
 	switch p.OutputType {
 	case Dashboard:
 		// nothing
+		return p.GetCommitsTable(r, limitWeeks)
 	default:
-		fmt.Print(p.GetCommitsTable(r))
+		fmt.Print(p.GetCommitsTable(r, limitWeeks))
 	}
+	return ""
 }
 
-func (p StatsResultConsolePrinter) GetCommitsTable(s *StatsResult) string {
+func (p StatsResultConsolePrinter) GetCommitsTable(s *StatsResult, limitWeeks int) string {
 	keys := sortMapIntoSlice(s)
-	return p.getCells(keys, s)
+	return p.getCells(keys, s, limitWeeks)
 }
 
 func (p StatsResultConsolePrinter) colorize(c Color, s string) string {
@@ -57,7 +59,7 @@ func colorize(c Color, s string, oType OutputType) string {
 	switch oType {
 	case Dashboard:
 
-		cFormat := "black"
+		var cFormat string
 		switch c.Background {
 		case color.BgGreen:
 			cFormat = "green"
@@ -83,11 +85,18 @@ func Print(c Color, s string) {
 
 // printMonths prints the month names in the first line, determining when the month
 // changed between switching weeks
-func getMonths(r *StatsResult) string {
+func getMonths(r *StatsResult, limitWeeks int) string {
 	week := getBeginningOfDay(r.EndOfScan).Add(-(time.Duration(r.DurationInDays) * time.Hour * 24))
 	month := week.Month()
 	out := "         "
+	i := r.Options.DurationParamInWeeks
 	for {
+		if i > limitWeeks {
+			i -= 1
+			week = week.Add(7 * time.Hour * 24)
+			continue
+		}
+
 		if week.Month() != month {
 			out += fmt.Sprintf("%s ", week.Month().String()[:3])
 			month = week.Month()
@@ -121,16 +130,20 @@ func getDayCol(day int) string {
 }
 
 // getCells build a string for the cells of the graph
-func (p StatsResultConsolePrinter) getCells(keys []int, r *StatsResult) string {
-	cols := buildCols(keys, r)
+func (p StatsResultConsolePrinter) getCells(keys []int, r *StatsResult, limitWeeks int) string {
+	cols := buildCols(keys, r, limitWeeks)
 	out := ""
-	out += getMonths(r)
+	out += getMonths(r, limitWeeks)
 	durationInWeeks := r.DurationInDays / 7
 	for j := 6; j >= 0; j-- {
 		for i := durationInWeeks + 1; i >= 0; i-- {
 			if i == durationInWeeks+1 {
 				out += getDayCol(j)
 			}
+			if limitWeeks > 0 && limitWeeks-i < 0 {
+				continue
+			}
+
 			if col, ok := cols[i]; ok {
 				// special case today
 				if getEndOfDay(time.Now()).Equal(getEndOfDay(r.EndOfScan)) && i == 0 && j == calcOffset(getEndOfDay(time.Now())) {
@@ -195,7 +208,7 @@ func sortMapIntoSlice(r *StatsResult) []int {
 }
 
 // buildCols generates a map with rows and columns ready to be printed to screen
-func buildCols(keys []int, r *StatsResult) map[int]column {
+func buildCols(keys []int, r *StatsResult, limitWeeks int) map[int]column {
 	cols := make(map[int]column)
 	col := column{}
 	for _, k := range keys {
@@ -204,6 +217,10 @@ func buildCols(keys []int, r *StatsResult) map[int]column {
 
 		if dayinweek == 0 { //reset
 			col = column{}
+			wInverted := (len(keys) / 7) - (k / 7)
+			if limitWeeks > 0 && limitWeeks-wInverted <= 0 {
+				continue
+			}
 		}
 
 		col = append(col, r.Commits[k])

@@ -3,7 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/user"
@@ -20,7 +19,7 @@ func getUserFromGitConfig() (*string, *string, error) {
 	user, _ := user.Current()
 	// don't forget to handle error!
 	gitconfig := filepath.Join(user.HomeDir, ".gitconfig")
-	bytes, _ := ioutil.ReadFile(gitconfig)
+	bytes, _ := os.ReadFile(gitconfig)
 
 	config, _, err := goconfig.Parse(bytes)
 	if err != nil {
@@ -171,6 +170,7 @@ func argParse(c *cli.Context, useDashboard bool) error {
 	durationInWeeks := 0
 	width, _, _ := term.GetSize(0)
 
+	durationInWeeks = 52
 	if weeks != nil {
 		if width < (4**weeks)+16 && !useDashboard {
 			return errors.New("too much data to display in this terminal width")
@@ -178,7 +178,9 @@ func argParse(c *cli.Context, useDashboard bool) error {
 		durationInWeeks = *weeks
 	} else {
 		defaultDuration := (width - 16) / 4
-		durationInWeeks = defaultDuration
+		if !useDashboard {
+			durationInWeeks = defaultDuration
+		}
 	}
 
 	if useDashboard {
