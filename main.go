@@ -68,7 +68,7 @@ func commands() []*cli.Command {
 		},
 		{
 			Name:    "dashboard",
-			Aliases: []string{"lr"},
+			Aliases: []string{},
 			Usage:   "Open a dashboard for print statistics",
 			Action: func(c *cli.Context) error {
 				return argParse(c, true)
@@ -213,9 +213,12 @@ func addToScan(folder string) error {
 func main() {
 	var app = &cli.App{
 		Name:     "gitcontribution",
-		Version:  "v1.0.0",
+		Version:  "v1.1.0",
 		Compiled: time.Now(),
 		Commands: commands(),
+		Action: func(c *cli.Context) error {
+			return argParse(c, false)
+		},
 	}
 	err := app.Run(os.Args)
 	app.EnableBashCompletion = true

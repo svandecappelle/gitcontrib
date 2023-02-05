@@ -101,6 +101,7 @@ func Launch(opts LaunchOptions) []*StatsResult {
 
 	for _, r := range results {
 		if !opts.Dashboard {
+			fmt.Println()
 			PrintResult(r)
 		}
 	}
@@ -113,6 +114,11 @@ func PrintResult(r *StatsResult) {
 	start := r.EndOfScan
 	start = getBeginningOfDay(start.AddDate(0, 0, -o.DurationParamInWeeks*7))
 	end := getEndOfDay(r.EndOfScan)
+
+	if !o.Silent {
+		Print(Header, strings.Join(o.Folders, ","))
+		fmt.Println()
+	}
 
 	fmt.Printf("Scanning for ")
 	if o.EmailOrUsername != nil {
@@ -193,11 +199,6 @@ func populateDurationInDays(options LaunchOptions, r *StatsResult) {
 // Stats calculates and prints the stats.
 func Stats(r *StatsResult, wg *sync.WaitGroup, bar *progressbar.ProgressBar) {
 	defer wg.Done()
-	o := r.Options
-	if !o.Silent {
-		Print(Header, strings.Join(o.Folders, ","))
-		fmt.Println()
-	}
 	err := processRepositories(r, bar)
 
 	if err != nil {
@@ -205,7 +206,7 @@ func Stats(r *StatsResult, wg *sync.WaitGroup, bar *progressbar.ProgressBar) {
 		return
 	}
 
-	r.Folder = strings.Join(o.Folders, ",")
+	r.Folder = strings.Join(r.Options.Folders, ",")
 }
 
 // getBeginningOfDay given a time.Time calculates the start time of that day
@@ -328,7 +329,7 @@ func processRepositories(r *StatsResult, bar *progressbar.ProgressBar) error {
 		err := fillCommits(r, r.Options.EmailOrUsername, path, bar)
 		if err != nil {
 			// continue for other folders
-			Print(Error, fmt.Sprintf("Error scanning folder repository %s: %s\n", path, err))
+			Print(Error, fmt.Sprintf("\nError scanning folder repository %s: %s\n", path, err))
 			errReturn = err
 			continue
 		}
