@@ -86,7 +86,7 @@ func commands() []*cli.Command {
 				},
 				&cli.BoolFlag{
 					Name:  "merge",
-					Value: true,
+					Value: false,
 					Usage: "Merge all scanned repository",
 				},
 				&cli.BoolFlag{
@@ -188,7 +188,7 @@ func argParse(c *cli.Context, useDashboard bool) error {
 			User:            user,
 			DurationInWeeks: durationInWeeks,
 			Folders:         folders,
-			Merge:           c.Bool("merge"),
+			Merge:           false,
 			Delta:           c.String("delta"),
 			Dashboard:       true,
 		})

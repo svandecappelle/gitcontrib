@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"strconv"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
@@ -12,21 +11,87 @@ import (
 )
 
 func OpenDashboard(opts LaunchOptions) {
-	folders, _ := GetFolders()
+	folders := opts.Folders
 	results := []string{}
 	width, height, _ := term.GetSize(0)
-
 	rLaunch := Launch(opts)
-	output := ""
 	nbCommits := 0
-	for _, r := range rLaunch {
-		line := fmt.Sprintf("%s: %d", r.Folder, len(r.Commits))
-		for _, commit := range r.Commits {
+	nbAnalyzed := 0
+
+	var hoursData []float64 = make([]float64, 24)
+	var hoursLabels []string = make([]string, 24)
+	var authors map[string][]float64 = make(map[string][]float64)
+	var daysData []float64 = make([]float64, 7)
+	colors := []string{"red", "green", "yellow", "blue", "magenta", "cyan", "white"}
+	var contribs []string
+
+	mergedValues := StatsResult{
+		Options:        rLaunch[0].Options,
+		BeginOfScan:    rLaunch[0].BeginOfScan,
+		EndOfScan:      rLaunch[0].EndOfScan,
+		DurationInDays: rLaunch[0].DurationInDays,
+		Folder:         "",
+		Commits:        make(map[int]int),
+		Error:          nil,
+	}
+
+	var nbErrors int
+	for i := 1; i <= 24; i++ {
+		hoursLabels[i-1] = fmt.Sprintf("%d", i)
+	}
+
+	for _, l := range rLaunch {
+		if l.Error != nil {
+			nbErrors += 1
+			continue
+		}
+		nbAnalyzed += 1
+		commitsByRepo := 0
+		for i, commit := range l.Commits {
 			// calculate week day
 			nbCommits += commit
+			commitsByRepo += commit
+			mergedValues.Commits[i] += commit
 		}
-		output += line
-		results = append(results, line)
+		if commitsByRepo > 0 {
+			line := fmt.Sprintf("%s: %d", l.Folder, commitsByRepo)
+			results = append(results, line)
+		}
+		for i, v := range l.DayCommits {
+			daysData[i] += float64(v)
+		}
+		for i, v := range l.HoursCommits {
+			hoursData[i] += float64(v)
+		}
+
+		for author, c := range l.AuthorsEditions {
+			if authors[author] == nil {
+				authors[author] = make([]float64, 2)
+			}
+			authors[author][0] += float64(c["additions"])
+			authors[author][1] += float64(c["deletions"])
+		}
+	}
+
+	if nbErrors == len(rLaunch) {
+		panic("Launch has only errors")
+	}
+
+	var allContributions []float64
+	var aCounter int
+	for a, c := range authors {
+		allContributions = append(allContributions, c[0]+c[1])
+		contribs = append(
+			contribs,
+			fmt.Sprintf(
+				"[%s](fg:%s): [+%d](fg:green):[-%d](fg:red)",
+				a,
+				colors[aCounter%len(colors)],
+				int64(c[0]),
+				int64(c[1]),
+			),
+		)
+		aCounter += 1
 	}
 
 	if err := ui.Init(); err != nil {
@@ -40,21 +105,20 @@ func OpenDashboard(opts LaunchOptions) {
 	if rLaunch[0].Options.EmailOrUsername != nil {
 		user = *rLaunch[0].Options.EmailOrUsername
 	}
+
+	analyzed := len(folders)
+	if analyzed != nbAnalyzed {
+		analyzed = nbAnalyzed
+	}
+
 	p.Rows = []string{
 		fmt.Sprintf("BeginDate: %s", rLaunch[0].BeginOfScan),
 		fmt.Sprintf("EndDate: %s", rLaunch[0].EndOfScan),
 		fmt.Sprintf("Commits: %d", nbCommits),
-		fmt.Sprintf("Analyzed repos: %d", len(folders)),
+		fmt.Sprintf("Analyzed repos: %d", analyzed),
 		fmt.Sprintf("User analyzed: %s", user),
 	}
 	p.SetRect(0, 0, width/3, height/3)
-
-	ui.Render(p)
-
-	var daysData []float64
-	for _, v := range rLaunch[0].DayCommits {
-		daysData = append(daysData, float64(v))
-	}
 
 	bc := widgets.NewBarChart()
 	bc.Title = "Commits on weekday"
@@ -63,14 +127,6 @@ func OpenDashboard(opts LaunchOptions) {
 	bc.BarGap = 0
 	bc.Data = daysData
 	bc.BarWidth = int(width / 7 / 4)
-	ui.Render(bc)
-
-	var hoursData []float64
-	var hoursLabels []string
-	for i, v := range rLaunch[0].HoursCommits {
-		hoursData = append(hoursData, float64(v))
-		hoursLabels = append(hoursLabels, strconv.Itoa(i+1))
-	}
 
 	hoursGraph := widgets.NewBarChart()
 	hoursGraph.Title = "Commits on daytime"
@@ -79,33 +135,11 @@ func OpenDashboard(opts LaunchOptions) {
 	hoursGraph.Data = hoursData
 	hoursGraph.Labels = hoursLabels
 	hoursGraph.BarGap = 0
-	ui.Render(hoursGraph)
 
-	contribs := []string{}
-	contributorsMap := make(map[int]string)
-	allContributions := make([]float64, len(rLaunch[0].AuthorsEditions))
-	i := 0
-	colors := []string{"red", "green", "yellow", "blue", "magenta", "cyan", "white"}
-	for author, c := range rLaunch[0].AuthorsEditions {
-		contribs = append(
-			contribs,
-			fmt.Sprintf(
-				"[%s](fg:%s): [+%d](fg:green):[-%d](fg:red)",
-				author,
-				colors[i%len(colors)],
-				c["additions"],
-				c["deletions"],
-			),
-		)
-		allContributions[i] = float64(c["additions"] + c["deletions"])
-		contributorsMap[i] = author
-		i += 1
-	}
 	contributors := widgets.NewList()
 	contributors.Title = "Contributors"
 	contributors.Rows = contribs
 	contributors.SetRect(width/3, 0, width/3*2, height/3)
-	ui.Render(contributors)
 
 	contribGraph := widgets.NewPieChart()
 	contribGraph.Title = "Committers"
@@ -115,13 +149,11 @@ func OpenDashboard(opts LaunchOptions) {
 		return fmt.Sprintf("%d", int(v))
 	}
 	contribGraph.SetRect(width/3*2, 0, width, height/3)
-	ui.Render(contribGraph)
 
 	foldersStats := widgets.NewList()
 	foldersStats.Title = "Repositories"
 	foldersStats.Rows = results
 	foldersStats.SetRect(width/4, height/3*2, width/2, height)
-	ui.Render(foldersStats)
 
 	heatmap := widgets.NewParagraph()
 	heatmap.Title = "Heatmap"
@@ -131,8 +163,9 @@ func OpenDashboard(opts LaunchOptions) {
 	if defaultDurationTruncated > rLaunch[0].Options.DurationParamInWeeks {
 		defaultDurationTruncated = rLaunch[0].Options.DurationParamInWeeks
 	}
-	heatmap.Text = StatsResultConsolePrinter{Dashboard}.print(rLaunch[0], defaultDurationTruncated)
-	ui.Render(heatmap)
+	heatmap.Text = StatsResultConsolePrinter{Dashboard}.print(&mergedValues, defaultDurationTruncated)
+
+	ui.Render(p, bc, hoursGraph, contributors, contribGraph, foldersStats, heatmap)
 
 	uiEvents := ui.PollEvents()
 	for e := range uiEvents {
