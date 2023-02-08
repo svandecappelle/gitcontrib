@@ -36,8 +36,8 @@ func OpenDashboard(opts LaunchOptions) {
 	}
 
 	var nbErrors int
-	for i := 1; i <= 24; i++ {
-		hoursLabels[i-1] = fmt.Sprintf("%d", i)
+	for i := 0; i < 24; i++ {
+		hoursLabels[i] = fmt.Sprintf("%d", i)
 	}
 
 	for _, l := range rLaunch {
@@ -58,7 +58,7 @@ func OpenDashboard(opts LaunchOptions) {
 			results = append(results, line)
 		}
 		for i, v := range l.DayCommits {
-			daysData[i] += float64(v)
+			daysData[(i+6)%7] += float64(v)
 		}
 		for i, v := range l.HoursCommits {
 			hoursData[i] += float64(v)

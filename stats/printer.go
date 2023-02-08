@@ -3,15 +3,9 @@ package stats
 import (
 	"fmt"
 	"sort"
+	"strings"
 	"time"
-
-	"github.com/fatih/color"
 )
-
-type Color struct {
-	Foreground color.Attribute
-	Background color.Attribute
-}
 
 type OutputType int64
 
@@ -20,19 +14,33 @@ const (
 	Dashboard OutputType = 1
 )
 
-var (
-	Today       = Color{color.FgWhite, color.BgMagenta}
-	ValueLow    = Color{color.FgBlack, color.BgWhite}
-	ValueMiddle = Color{color.FgBlack, color.BgYellow}
-	ValueHigh   = Color{color.FgBlack, color.BgGreen}
-	Empty       = Color{color.FgWhite, color.BgBlack}
-	Message     = Color{color.FgGreen, color.BgBlack}
-	Error       = Color{color.FgRed, color.Bold}
-	Header      = Color{color.FgMagenta, color.Bold}
-)
-
 type StatsResultConsolePrinter struct {
 	OutputType OutputType
+}
+
+func PrintResult(r *StatsResult) {
+	o := r.Options
+	start := getBeginningOfDay(r.BeginOfScan)
+	end := getEndOfDay(r.EndOfScan)
+
+	if !o.Silent {
+		Print(Header, strings.Join(o.Folders, ","))
+		fmt.Println()
+	}
+
+	fmt.Printf("Scanning for ")
+	if o.EmailOrUsername != nil {
+		Print(Message, *o.EmailOrUsername)
+	} else {
+		Print(Message, "all")
+	}
+	fmt.Printf(" contributions from ")
+	Print(Message, start.Format("January 02, 2006 15:04:05"))
+	fmt.Printf(" to ")
+	Print(Message, end.Format("January 02, 2006 15:04:05"))
+	fmt.Println()
+	fmt.Println()
+	StatsResultConsolePrinter{Console}.print(r, -1)
 }
 
 func (p StatsResultConsolePrinter) print(r *StatsResult, limitWeeks int) string {
@@ -51,35 +59,11 @@ func (p StatsResultConsolePrinter) GetCommitsTable(s *StatsResult, limitWeeks in
 	return p.getCells(keys, s, limitWeeks)
 }
 
-func (p StatsResultConsolePrinter) colorize(c Color, s string) string {
+func (p StatsResultConsolePrinter) colorize(c TermStyle, s string) string {
 	return colorize(c, s, p.OutputType)
 }
 
-func colorize(c Color, s string, oType OutputType) string {
-	switch oType {
-	case Dashboard:
-
-		var cFormat string
-		switch c.Background {
-		case color.BgGreen:
-			cFormat = "green"
-		case color.BgMagenta:
-			cFormat = "magenta"
-		case color.BgRed:
-			cFormat = "red"
-		case color.BgYellow:
-			cFormat = "red"
-		default:
-			cFormat = "black"
-		}
-		return fmt.Sprintf("[%s](bg:%s)", s, cFormat)
-
-	default:
-		return color.New(c.Foreground, c.Background).SprintfFunc()(s)
-	}
-}
-
-func Print(c Color, s string) {
+func Print(c TermStyle, s string) {
 	fmt.Print(colorize(c, s, Console))
 }
 
@@ -88,26 +72,22 @@ func Print(c Color, s string) {
 func getMonths(r *StatsResult, limitWeeks int) string {
 	week := getBeginningOfDay(r.EndOfScan).Add(-(time.Duration(r.DurationInDays) * time.Hour * 24))
 	month := week.Month()
-	out := "         "
-	i := r.Options.DurationParamInWeeks
-	for {
-		if i > limitWeeks {
-			i -= 1
+	out := "    "
+	i := r.DurationInDays
+	for week.Before(r.EndOfScan) {
+		if limitWeeks > 0 && i > limitWeeks*7 {
+			i -= 7
 			week = week.Add(7 * time.Hour * 24)
 			continue
 		}
 
 		if week.Month() != month {
-			out += fmt.Sprintf("%s ", week.Month().String()[:3])
+			out += fmt.Sprintf(" %s", week.Month().String()[:3])
 			month = week.Month()
 		} else {
 			out += "    "
 		}
-
 		week = week.Add(7 * time.Hour * 24)
-		if week.After(r.EndOfScan) {
-			break
-		}
 	}
 	out += "\n"
 	return out
@@ -116,56 +96,54 @@ func getMonths(r *StatsResult, limitWeeks int) string {
 // printDayCol given the day number (0 is Sunday) prints the day name,
 // alternating the rows (prints just 2,4,6)
 func getDayCol(day int) string {
-	out := "     "
-	switch day {
-	case 1:
-		out = " Mon "
-	case 3:
-		out = " Wed "
-	case 5:
-		out = " Fri "
-	}
-
-	return out
+	days := []string{"Su ", "Mo ", "Tu ", "We ", "Th ", "Fr ", "Sa "}
+	return days[day]
 }
 
 // getCells build a string for the cells of the graph
 func (p StatsResultConsolePrinter) getCells(keys []int, r *StatsResult, limitWeeks int) string {
-	cols := buildCols(keys, r, limitWeeks)
 	out := ""
 	out += getMonths(r, limitWeeks)
 	durationInWeeks := r.DurationInDays / 7
-	for j := 6; j >= 0; j-- {
-		for i := durationInWeeks + 1; i >= 0; i-- {
-			if i == durationInWeeks+1 {
-				out += getDayCol(j)
-			}
-			if limitWeeks > 0 && limitWeeks-i < 0 {
+
+	begin := r.BeginOfScan // .AddDate(0, 0, int(-offset))
+	end := getEndOfDay(r.EndOfScan)
+
+	current := begin
+	for i := 0; i < 7; i += 1 {
+		// Let loop on data with starting column and adds 7 to each cell to print
+		// Then start with weekDay gap
+		current = begin.AddDate(0, 0, i)
+		weekNum := durationInWeeks
+
+		for current.Before(end) {
+			if limitWeeks > 0 && weekNum > limitWeeks {
+				weekNum -= 1
+				current = current.AddDate(0, 0, 7)
 				continue
 			}
-
-			if col, ok := cols[i]; ok {
-				// special case today
-				if getEndOfDay(time.Now()).Equal(getEndOfDay(r.EndOfScan)) && i == 0 && j == calcOffset(getEndOfDay(time.Now())) {
-					out += p.getCell(col[j], true)
-					continue
-				} else {
-					if len(col) > j {
-						out += p.getCell(col[j], false)
-						continue
-					}
-				}
+			if daysBetween(r.BeginOfScan, current) < 7 {
+				// first week print weekday
+				out += getDayCol(int(current.Weekday()))
 			}
-			out += p.getCell(0, false)
+			day := end.Sub(current).Hours() / 24
+			out += p.getCell(r.Commits[int(day+8)], current)
+
+			if daysBetween(current, r.EndOfScan) < 7 {
+				// last week return to begin
+				out += "\n"
+			}
+
+			weekNum -= 1
+			current = current.AddDate(0, 0, 7)
 		}
-		out += "\n"
 	}
 	return out
 }
 
 // getCell given a cell value prints it with a different format
 // based on the value amount, and on the `today` flag.
-func (p StatsResultConsolePrinter) getCell(val int, today bool) string {
+func (p StatsResultConsolePrinter) getCell(val int, date time.Time) string {
 	str := "  %d "
 	switch {
 	case val == 0:
@@ -181,8 +159,12 @@ func (p StatsResultConsolePrinter) getCell(val int, today bool) string {
 		cellContent = fmt.Sprintf(str, val)
 	}
 	switch {
-	case today:
+	case getBeginningOfDay(date).Equal(getBeginningOfDay(time.Now())):
+		// today
 		return p.colorize(Today, cellContent)
+	case date.Day() == 1:
+		// first of month
+		return p.colorize(FirstOfMonth, cellContent)
 	case val == 0:
 		return p.colorize(Empty, "  - ")
 	case val > 0 && val < 5:
@@ -205,30 +187,4 @@ func sortMapIntoSlice(r *StatsResult) []int {
 	sort.Ints(keys)
 
 	return keys
-}
-
-// buildCols generates a map with rows and columns ready to be printed to screen
-func buildCols(keys []int, r *StatsResult, limitWeeks int) map[int]column {
-	cols := make(map[int]column)
-	col := column{}
-	for _, k := range keys {
-		week := int(k / 7) // 26,25...1
-		dayinweek := k % 7 // 0,1,2,3,4,5,6
-
-		if dayinweek == 0 { //reset
-			col = column{}
-			wInverted := (len(keys) / 7) - (k / 7)
-			if limitWeeks > 0 && limitWeeks-wInverted <= 0 {
-				continue
-			}
-		}
-
-		col = append(col, r.Commits[k])
-
-		if dayinweek == 6 {
-			cols[week] = col
-		}
-	}
-
-	return cols
 }

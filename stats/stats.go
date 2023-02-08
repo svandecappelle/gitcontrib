@@ -18,8 +18,6 @@ const outOfRange = 99999
 
 var DefaultDurationInDays = 365
 
-type column []int
-
 type LaunchOptions struct {
 	User            *string
 	DurationInWeeks int
@@ -109,32 +107,6 @@ func Launch(opts LaunchOptions) []*StatsResult {
 	return results
 }
 
-func PrintResult(r *StatsResult) {
-	o := r.Options
-	start := r.EndOfScan
-	start = getBeginningOfDay(start.AddDate(0, 0, -o.DurationParamInWeeks*7))
-	end := getEndOfDay(r.EndOfScan)
-
-	if !o.Silent {
-		Print(Header, strings.Join(o.Folders, ","))
-		fmt.Println()
-	}
-
-	fmt.Printf("Scanning for ")
-	if o.EmailOrUsername != nil {
-		Print(Message, *o.EmailOrUsername)
-	} else {
-		Print(Message, "all")
-	}
-	fmt.Printf(" contributions from ")
-	Print(Message, start.Format(time.RFC1123))
-	fmt.Printf(" to ")
-	Print(Message, end.Format(time.RFC1123))
-	fmt.Println()
-	fmt.Println()
-	StatsResultConsolePrinter{Console}.print(r, -1)
-}
-
 func populateDurationInDays(options LaunchOptions, r *StatsResult) {
 	nowDate := time.Now()
 	end := nowDate
@@ -194,6 +166,20 @@ func populateDurationInDays(options LaunchOptions, r *StatsResult) {
 	r.DurationInDays = durationInDays
 	r.EndOfScan = end
 	r.BeginOfScan = end.AddDate(0, 0, -durationInDays)
+	if int(r.BeginOfScan.Weekday()) != 1 {
+		// Not a monday
+		// offset := math.Max(0, float64(6-int(r.BeginOfScan.Weekday())))
+		offset := -1 * (int(r.BeginOfScan.Weekday()) - 1)
+		r.BeginOfScan = getBeginningOfDay(r.BeginOfScan.AddDate(0, 0, offset))
+
+		r.EndOfScan = getEndOfDay(r.EndOfScan.AddDate(0, 0, offset+6))
+		daysBetween := r.EndOfScan.Sub(r.BeginOfScan).Hours() / 24
+		r.DurationInDays = int(daysBetween)
+	}
+}
+
+func daysBetween(begin time.Time, end time.Time) int {
+	return int(end.Sub(begin).Hours() / 24)
 }
 
 // Stats calculates and prints the stats.

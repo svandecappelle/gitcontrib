@@ -213,7 +213,7 @@ func addToScan(folder string) error {
 func main() {
 	var app = &cli.App{
 		Name:     "gitcontribution",
-		Version:  "v1.2.0",
+		Version:  "v1.3.0",
 		Compiled: time.Now(),
 		Commands: commands(),
 		Action: func(c *cli.Context) error {
