@@ -112,7 +112,6 @@ func OpenDashboard(opts LaunchOptions) {
 		return sAuthors[i].Total() > sAuthors[j].Total()
 	})
 	for colorIdx, a := range sAuthors {
-		fmt.Printf("On test %d %s \n", colorIdx, a.Author)
 		contribs = append(
 			contribs,
 			a.Str(colors[colorIdx%len(colors)]),
