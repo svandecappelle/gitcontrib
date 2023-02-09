@@ -93,6 +93,11 @@ func OpenDashboard(opts LaunchOptions) {
 		}
 	}
 
+	if nbCommits == 0 {
+		fmt.Println("\nNo commits found to parse")
+		return
+	}
+
 	if nbErrors == len(rLaunch) {
 		panic("Launch has only errors")
 	}
