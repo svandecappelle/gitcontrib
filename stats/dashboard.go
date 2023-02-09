@@ -4,11 +4,31 @@ import (
 	"fmt"
 	"log"
 	"math"
+	"sort"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
 	"golang.org/x/term"
 )
+
+type Contributions struct {
+	Author    string
+	Additions int
+	Deletions int
+}
+
+func (c Contributions) Total() int {
+	return c.Additions + c.Deletions
+}
+func (c Contributions) Str(color string) string {
+	return fmt.Sprintf(
+		"[%s](fg:%s): [+%d](fg:green):[-%d](fg:red)",
+		c.Author,
+		color,
+		c.Additions,
+		c.Deletions,
+	)
+}
 
 func OpenDashboard(opts LaunchOptions) {
 	folders := opts.Folders
@@ -78,20 +98,25 @@ func OpenDashboard(opts LaunchOptions) {
 	}
 
 	var allContributions []float64
-	var aCounter int
+	var sAuthors []Contributions
 	for a, c := range authors {
-		allContributions = append(allContributions, c[0]+c[1])
+		additionsAndDeletions := c[0] + c[1]
+		allContributions = append(allContributions, additionsAndDeletions)
+		sAuthors = append(sAuthors, Contributions{
+			Author:    a,
+			Additions: int(c[0]),
+			Deletions: int(c[1]),
+		})
+	}
+	sort.Slice(sAuthors, func(i, j int) bool {
+		return sAuthors[i].Total() > sAuthors[j].Total()
+	})
+	for colorIdx, a := range sAuthors {
+		fmt.Printf("On test %d %s \n", colorIdx, a.Author)
 		contribs = append(
 			contribs,
-			fmt.Sprintf(
-				"[%s](fg:%s): [+%d](fg:green):[-%d](fg:red)",
-				a,
-				colors[aCounter%len(colors)],
-				int64(c[0]),
-				int64(c[1]),
-			),
+			a.Str(colors[colorIdx%len(colors)]),
 		)
-		aCounter += 1
 	}
 
 	if err := ui.Init(); err != nil {
@@ -165,13 +190,29 @@ func OpenDashboard(opts LaunchOptions) {
 	}
 	heatmap.Text = StatsResultConsolePrinter{Dashboard}.print(&mergedValues, defaultDurationTruncated)
 
-	ui.Render(p, bc, hoursGraph, contributors, contribGraph, foldersStats, heatmap)
+	ui.Render(p, bc, hoursGraph, contribGraph, contributors, foldersStats, heatmap)
 
 	uiEvents := ui.PollEvents()
+	selectedList := contributors
+	selectedList.BorderStyle.Fg = ui.ColorYellow
 	for e := range uiEvents {
 		switch e.ID {
 		case "q", "<C-c>":
 			return
+		case "k", "<Up>":
+			selectedList.ScrollUp()
+		case "j", "<Down>":
+			selectedList.ScrollDown()
+		case "n":
+			selectedList.BorderStyle.Fg = ui.ColorWhite
+			if selectedList == contributors {
+				selectedList = foldersStats
+			} else {
+				selectedList = contributors
+			}
+			selectedList.BorderStyle.Fg = ui.ColorYellow
 		}
+
+		ui.Render(contributors, foldersStats)
 	}
 }
