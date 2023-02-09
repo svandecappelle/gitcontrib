@@ -173,6 +173,7 @@ func OpenDashboard(opts LaunchOptions) {
 	contribGraph := widgets.NewPieChart()
 	contribGraph.Title = "Committers"
 	contribGraph.Data = allContributions
+	contribGraph.Colors = []ui.Color{ui.ColorRed, ui.ColorGreen, ui.ColorYellow, ui.ColorBlue, ui.ColorMagenta, ui.ColorCyan, ui.ColorWhite}
 	contribGraph.AngleOffset = -.5 * math.Pi
 	contribGraph.LabelFormatter = func(i int, v float64) string {
 		return fmt.Sprintf("%d", int(v))
