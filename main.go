@@ -94,6 +94,14 @@ func commands() []*cli.Command {
 					Value: false,
 					Usage: "Force count all users contributions",
 				},
+				&cli.StringSliceFlag{
+					Name:  "file-exclude-pattern",
+					Usage: "File pattern to exclude of contributions statistics",
+				},
+				&cli.StringSliceFlag{
+					Name:  "file-include-pattern",
+					Usage: "File pattern to include of contributions statistics",
+				},
 			},
 		},
 		{
@@ -185,12 +193,14 @@ func argParse(c *cli.Context, useDashboard bool) error {
 
 	if useDashboard {
 		stats.OpenDashboard(stats.LaunchOptions{
-			User:            user,
-			DurationInWeeks: durationInWeeks,
-			Folders:         folders,
-			Merge:           false,
-			Delta:           c.String("delta"),
-			Dashboard:       true,
+			User:             user,
+			DurationInWeeks:  durationInWeeks,
+			Folders:          folders,
+			Merge:            false,
+			Delta:            c.String("delta"),
+			Dashboard:        true,
+			PatternToExclude: c.StringSlice("file-exclude-pattern"),
+			PatternToInclude: c.StringSlice("file-include-pattern"),
 		})
 	} else {
 		stats.Launch(stats.LaunchOptions{
@@ -213,7 +223,7 @@ func addToScan(folder string) error {
 func main() {
 	var app = &cli.App{
 		Name:     "gitcontribution",
-		Version:  "v1.4.3",
+		Version:  "v1.5.0",
 		Compiled: time.Now(),
 		Commands: commands(),
 		Action: func(c *cli.Context) error {

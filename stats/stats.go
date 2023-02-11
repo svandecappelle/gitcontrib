@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,12 +20,14 @@ const outOfRange = 99999
 var DefaultDurationInDays = 365
 
 type LaunchOptions struct {
-	User            *string
-	DurationInWeeks int
-	Folders         []string
-	Merge           bool
-	Delta           string
-	Dashboard       bool
+	User             *string
+	DurationInWeeks  int
+	Folders          []string
+	Merge            bool
+	Delta            string
+	Dashboard        bool
+	PatternToExclude []string
+	PatternToInclude []string
 }
 
 type StatsResult struct {
@@ -46,6 +49,8 @@ type StatsOptions struct {
 	Folders              []string
 	Delta                string
 	Silent               bool
+	PatternToExclude     []string
+	PatternToInclude     []string
 }
 
 func isRepo(path string) bool {
@@ -67,6 +72,8 @@ func Launch(opts LaunchOptions) []*StatsResult {
 			Folders:              opts.Folders,
 			Delta:                opts.Delta,
 			Silent:               opts.Dashboard,
+			PatternToExclude:     opts.PatternToExclude,
+			PatternToInclude:     opts.PatternToInclude,
 		}
 
 		r := &StatsResult{
@@ -85,6 +92,8 @@ func Launch(opts LaunchOptions) []*StatsResult {
 				Folders:              []string{folder},
 				Delta:                opts.Delta,
 				Silent:               opts.Dashboard,
+				PatternToExclude:     opts.PatternToExclude,
+				PatternToInclude:     opts.PatternToInclude,
 			}
 			r := &StatsResult{
 				Options: options,
@@ -274,8 +283,35 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 
 		// TODO find a solution for improve perf
 		stats, _ := c.Stats()
+		ignore := false
 		for _, stat := range stats {
-			// fmt.Printf("+%d, -%d %s", stat.Addition, stat.Deletion, stat.Name)
+			for _, pattern := range r.Options.PatternToExclude {
+				pR, eRegex := regexp.Compile(pattern)
+				if eRegex != nil {
+					log.Fatalf("Input regex is not valid")
+				}
+				if pR.MatchString(stat.Name) {
+					ignore = true
+					break
+				}
+			}
+			for _, pattern := range r.Options.PatternToInclude {
+				pR, eRegex := regexp.Compile(pattern)
+				if eRegex != nil {
+					log.Fatalf("Input regex is not valid")
+				}
+				if !pR.MatchString(stat.Name) {
+					ignore = true
+					continue
+				} else {
+					ignore = false
+					break
+				}
+			}
+
+			if ignore {
+				continue
+			}
 			if r.AuthorsEditions[c.Author.Name] == nil {
 				r.AuthorsEditions[c.Author.Name] = make(map[string]int, 2)
 			}
