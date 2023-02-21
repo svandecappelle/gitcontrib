@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/muja/goconfig"
+	"github.com/svandecappelle/gitcontrib/pkg/swagger/services"
 	"github.com/svandecappelle/gitcontrib/stats"
 	"github.com/urfave/cli/v2"
 	"golang.org/x/term"
@@ -105,6 +106,13 @@ func commands() []*cli.Command {
 			},
 		},
 		{
+			Name:    "api",
+			Aliases: []string{},
+			Action: func(c *cli.Context) error {
+				return server()
+			},
+		},
+		{
 			Name:    "stat",
 			Aliases: []string{"s"},
 			Usage:   "Email or Name: your@email.com / 'Firstname Name' - show constribution statistics of a user",
@@ -135,6 +143,10 @@ func commands() []*cli.Command {
 			},
 		},
 	}
+}
+
+func server() error {
+	return services.Start()
 }
 
 func argParse(c *cli.Context, useDashboard bool) error {

@@ -1,0 +1,98 @@
+consumes:
+- application/json
+info:
+  description: HTTP server in Go with Swagger endpoints definition.
+  title: go-rest-api
+  version: 0.1.0
+produces:
+- application/json
+schemes:
+- http
+swagger: "2.0"
+
+paths:
+  /alive:
+    get:
+      operationId: checkHealth
+      produces:
+      - text/plain
+      responses:
+        '200':
+          description: OK message.
+          schema:
+            type: string
+            enum:
+            - Yes
+
+  /hello/{user}:
+    get:
+      description: Returns a greeting to the user!
+      parameters:
+        - name: user
+          in: path
+          type: string
+          required: true
+          description: The name of the user to greet.
+      responses:
+        200:
+          description: Returns the greeting.
+          schema:
+            type: string
+        400:
+          description: Invalid characters in "user" were provided.
+  /api/report:
+    get:
+      description: Get statistics report for given dates
+      parameters:
+        - name: dateFrom
+          in: query
+          required: false
+          description: Recorded stats from a given date. Default is today minus 1 year.
+          type: string
+          format: date-time
+        - name: dateTo
+          in: query
+          required: false
+          description: Recorded stats to given date. Default is today.
+          type: string
+          format: date-time
+      responses:
+        200:
+          description: Returns the report of a given day
+          schema:
+            $ref: '#/definitions/GitStatisticsReport'
+        404:
+          description: Not any reports found
+definitions:
+  GitStatisticsReport:
+    type: object
+    properties:
+      dateFrom:
+        type: string
+        format: date-time
+      dateTo:
+        type: string
+        format: date-time
+      commits:
+        type: array
+        items:
+          $ref: '#/definitions/GitCommits'
+  GitCommits:
+    properties:
+      username:
+        type: string
+      datetime:
+        type: string
+        format: date-time
+      count:
+        type: integer
+      contributions:
+        type: object
+        $ref: '#/definitions/GitAuthorContributions'
+  GitAuthorContributions:
+    properties:
+      additions:
+        type: integer
+      deletions:
+        type: integer
+

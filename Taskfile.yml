@@ -1,0 +1,27 @@
+version: "3"
+
+tasks:
+    build:
+        desc: Build the app
+        cmds:
+        - GOFLAGS=-mod=mod go build -o bin/go-rest-api internal/main.go 
+
+    run:
+        desc: Run the app
+        cmds:
+        - GOFLAGS=-mod=mod go run internal/main.go
+
+    swagger.gen:
+        desc: Generate Go code
+        cmds:
+        - GOFLAGS=-mod=mod go generate github.com/svandecappelle/gitcontrib/internal github.com/svandecappelle/gitcontrib/pkg/swagger
+
+    swagger.validate:
+        desc: Validate swagger
+        cmds:
+        - swagger validate pkg/swagger/api.yaml
+
+    swagger.doc:
+        desc: Doc for swagger
+        cmds:
+        - docker run -i yousan/swagger-yaml-to-html < pkg/swagger/api.yaml > doc/index.html
