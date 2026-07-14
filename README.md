@@ -101,7 +101,8 @@ breakdown of commits by Conventional Commits type (feat, fix, …). The raw data
 is available as JSON on `http://localhost:8080/api/stats`. Author identities
 that share a name or an email are merged, so one person committing under
 several name/email combinations is counted once. Clicking a contributor filters
-the whole view down to that person (across all their identities).
+the whole view down to that person (across all their identities). An "Export
+JSON" button downloads the current statistics as a JSON file.
 
 The UI has a parameters form to re-run the analysis on the fly (number of
 weeks, delta, a specific user or all users, merge, include/exclude patterns).

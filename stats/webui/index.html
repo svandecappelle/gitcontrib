@@ -146,6 +146,7 @@
     <div class="controls">
       <span id="loader" class="spinner" style="display:none"></span>
       <span class="sub" id="cache-info"></span>
+      <button id="export-btn" type="button">Export JSON</button>
       <button id="refresh-btn" type="button">Refresh</button>
     </div>
   </header>
@@ -512,6 +513,7 @@
     let pollTimer = null;
     let currentQuery = '';
     let formInitialized = false;
+    let lastData = null;
 
     function scheduleAutoRefreshCheck(data) {
       clearTimeout(pollTimer);
@@ -632,7 +634,23 @@
         '<p class="msg">Failed to load statistics: ' + err.message + '</p>';
     }
 
+    // exportJSON downloads the currently displayed statistics as a JSON file,
+    // dropping the transient cache-control fields.
+    function exportJSON() {
+      if (!lastData) return;
+      const { stale, refreshing, ttlSeconds, ...clean } = lastData;
+      const user = (clean.user || 'all').replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '').toLowerCase() || 'all';
+      const blob = new Blob([JSON.stringify(clean, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = el('a', { href: url, download: `gitcontrib-${user}.json` });
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
     function render(data) {
+      lastData = data;
       document.getElementById('scan-info').textContent =
         `${data.user} · ${fmtDate(data.beginOfScan)} → ${fmtDate(data.endOfScan)}`;
       populateForm(data);
@@ -711,6 +729,7 @@
     }
 
     document.getElementById('refresh-btn').addEventListener('click', triggerRefresh);
+    document.getElementById('export-btn').addEventListener('click', exportJSON);
     document.getElementById('params-form').addEventListener('submit', applyParams);
     document.getElementById('f-countall').addEventListener('change', syncUserField);
     // Selecting a repository applies immediately.
