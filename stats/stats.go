@@ -43,6 +43,7 @@ type StatsResult struct {
 	AuthorsEditions  map[string]map[string]int
 	LanguageEditions map[string]map[string]int
 	CommitTypes      map[string]int
+	DayEditions      map[int][2]int // day index -> [additions, deletions]
 	Error            error
 }
 
@@ -337,6 +338,11 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 			}
 			r.LanguageEditions[lang]["additions"] = r.LanguageEditions[lang]["additions"] + stat.Addition
 			r.LanguageEditions[lang]["deletions"] = r.LanguageEditions[lang]["deletions"] + stat.Deletion
+
+			de := r.DayEditions[daysAgo]
+			de[0] += stat.Addition
+			de[1] += stat.Deletion
+			r.DayEditions[daysAgo] = de
 		}
 
 		if daysAgo <= r.DurationInDays {
@@ -365,6 +371,7 @@ func processRepositories(r *StatsResult, bar *progressbar.ProgressBar) error {
 	r.AuthorsEditions = make(map[string]map[string]int)
 	r.LanguageEditions = make(map[string]map[string]int)
 	r.CommitTypes = make(map[string]int)
+	r.DayEditions = make(map[int][2]int)
 	var errReturn error
 	for i := daysInMap; i > 0; i-- {
 		r.Commits[i] = 0

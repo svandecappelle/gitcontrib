@@ -94,8 +94,8 @@ gitcontribution web --addr :8080
 gitcontrib web interface listening on http://localhost:8080
 ```
 Then open http://localhost:8080 in a browser. The page shows the commit
-calendar, a weekly commits-over-time trend, commits by weekday and by hour, the
-contributors ranking with a
+calendar, weekly commits-over-time and lines-changed (additions/deletions)
+trends, commits by weekday and by hour, the contributors ranking with a
 contribution-share chart, a breakdown of changes by language / file type, and a
 breakdown of commits by Conventional Commits type (feat, fix, …). The raw data
 is available as JSON on `http://localhost:8080/api/stats`. Author identities

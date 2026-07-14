@@ -38,11 +38,13 @@ type CommitTypeCount struct {
 	Count int    `json:"count"`
 }
 
-// DayCount is the number of commits on a single calendar day.
+// DayCount is the activity of a single calendar day.
 type DayCount struct {
-	Date    string `json:"date"`    // YYYY-MM-DD
-	Count   int    `json:"count"`   // commits that day
-	Weekday int    `json:"weekday"` // 0=Sunday .. 6=Saturday
+	Date      string `json:"date"`      // YYYY-MM-DD
+	Count     int    `json:"count"`     // commits that day
+	Additions int    `json:"additions"` // lines added that day
+	Deletions int    `json:"deletions"` // lines removed that day
+	Weekday   int    `json:"weekday"`   // 0=Sunday .. 6=Saturday
 }
 
 // AggregatedStats is the whole set of statistics merged across every scanned
@@ -90,6 +92,7 @@ func Aggregate(results []*StatsResult) AggregatedStats {
 		EndOfScan:      first.EndOfScan,
 		DurationInDays: first.DurationInDays,
 		Commits:        make(map[int]int),
+		DayEditions:    make(map[int][2]int),
 	}
 
 	editions := make(map[string][2]int)     // author -> [additions, deletions]
@@ -108,6 +111,12 @@ func Aggregate(results []*StatsResult) AggregatedStats {
 			agg.TotalCommits += commit
 			commitsByRepo += commit
 			merged.Commits[i] += commit
+		}
+		for i, de := range l.DayEditions {
+			m := merged.DayEditions[i]
+			m[0] += de[0]
+			m[1] += de[1]
+			merged.DayEditions[i] = m
 		}
 		if commitsByRepo > 0 {
 			agg.Repositories = append(agg.Repositories, RepositoryStat{
@@ -174,10 +183,13 @@ func buildCalendar(r *StatsResult) []DayCount {
 	var days []DayCount
 	for d := r.BeginOfScan; d.Before(end); d = d.AddDate(0, 0, 1) {
 		idx := int(end.Sub(d).Hours()/24) + 8
+		de := r.DayEditions[idx]
 		days = append(days, DayCount{
-			Date:    d.Format("2006-01-02"),
-			Count:   r.Commits[idx],
-			Weekday: int(d.Weekday()),
+			Date:      d.Format("2006-01-02"),
+			Count:     r.Commits[idx],
+			Additions: de[0],
+			Deletions: de[1],
+			Weekday:   int(d.Weekday()),
 		})
 	}
 	return days
