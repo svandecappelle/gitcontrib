@@ -12,6 +12,9 @@ type Contributor struct {
 	Additions int    `json:"additions"`
 	Deletions int    `json:"deletions"`
 	Total     int    `json:"total"`
+	// Identities lists the names and emails merged into this contributor, so a
+	// client can filter on exactly this person (all their aliases).
+	Identities []string `json:"identities"`
 }
 
 // RepositoryStat is the commit count of a single scanned repository.

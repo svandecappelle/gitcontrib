@@ -84,11 +84,19 @@ func mergeAuthorAliases(editions map[string][2]int) []Contributor {
 	contributors := make([]Contributor, 0, len(groups))
 	for _, members := range groups {
 		additions, deletions, best := 0, 0, members[0]
+		var identities []string
+		seen := map[string]bool{}
 		for _, m := range members {
 			additions += ids[m].additions
 			deletions += ids[m].deletions
 			if ids[m].additions+ids[m].deletions > ids[best].additions+ids[best].deletions {
 				best = m
+			}
+			for _, v := range []string{ids[m].email, ids[m].name} {
+				if v = strings.TrimSpace(v); v != "" && !seen[v] {
+					seen[v] = true
+					identities = append(identities, v)
+				}
 			}
 		}
 		name := ids[best].name
@@ -96,10 +104,11 @@ func mergeAuthorAliases(editions map[string][2]int) []Contributor {
 			name = ids[best].email
 		}
 		contributors = append(contributors, Contributor{
-			Author:    name,
-			Additions: additions,
-			Deletions: deletions,
-			Total:     additions + deletions,
+			Author:     name,
+			Additions:  additions,
+			Deletions:  deletions,
+			Total:      additions + deletions,
+			Identities: identities,
 		})
 	}
 
