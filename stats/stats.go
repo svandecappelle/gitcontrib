@@ -3,6 +3,7 @@ package stats
 import (
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"regexp"
 	"strconv"
@@ -77,7 +78,7 @@ func compilePatterns(patterns []string) ([]*regexp.Regexp, error) {
 func Launch(opts LaunchOptions) []*StatsResult {
 	results := []*StatsResult{}
 	var wg sync.WaitGroup
-	bar := progressbar.Default(-1, "Analyzing commits")
+	bar := newProgressBar(opts.Dashboard)
 
 	// When merging, every folder is scanned into a single result; otherwise
 	// each folder is scanned independently.
@@ -108,6 +109,7 @@ func Launch(opts LaunchOptions) []*StatsResult {
 		go Stats(r, &wg, bar)
 	}
 	wg.Wait()
+	_ = bar.Finish()
 
 	for _, r := range results {
 		if !opts.Dashboard {
@@ -117,6 +119,16 @@ func Launch(opts LaunchOptions) []*StatsResult {
 	}
 
 	return results
+}
+
+// newProgressBar returns the "Analyzing commits" progress bar. When silent
+// (dashboard and web modes) it writes nowhere, so it does not clutter the
+// terminal on background refreshes.
+func newProgressBar(silent bool) *progressbar.ProgressBar {
+	if silent {
+		return progressbar.NewOptions(-1, progressbar.OptionSetWriter(io.Discard))
+	}
+	return progressbar.Default(-1, "Analyzing commits")
 }
 
 // parseDelta interprets a delta string of the form "<int>[y|m|w|d]" and returns
