@@ -58,7 +58,7 @@
 
     /* Parameters form */
     #params-panel { padding: 16px 32px; border-bottom: 1px solid var(--border); background: var(--panel); }
-    #params-form { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; max-width: 1200px; margin: 0 auto; }
+    #params-form { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; width: 100%; }
     .field { display: flex; flex-direction: column; gap: 4px; }
     .field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
     .field input[type=text], .field input[type=number] {
@@ -69,7 +69,7 @@
     .field.check { flex-direction: row; align-items: center; gap: 6px; height: 34px; }
     .field.check label { text-transform: none; font-size: 13px; letter-spacing: 0; color: var(--text); }
     #params-form input:disabled { opacity: .5; }
-    main { padding: 24px 32px; max-width: 1200px; margin: 0 auto; }
+    main { padding: 24px 32px; width: 100%; }
     .grid { display: grid; gap: 20px; }
     .cards { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
     .panels { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
