@@ -104,7 +104,7 @@
     th { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; }
     tbody tr { transition: background .15s ease; }
     tbody tr:hover { background: rgba(255, 255, 255, 0.05); }
-    .table-scroll { max-height: 340px; overflow-y: auto; }
+    .table-scroll { max-height: 620px; overflow-y: auto; }
     thead th { position: sticky; top: 0; background: var(--panel); border-bottom: none; box-shadow: inset 0 -1px 0 var(--border); z-index: 1; }
     td.num { text-align: right; font-variant-numeric: tabular-nums; }
     .add { color: var(--add); }
@@ -390,6 +390,8 @@
     function applyParams(e) {
       e.preventDefault();
       currentQuery = buildQuery();
+      // Reflect the parameters in the page URL so it can be shared/bookmarked.
+      history.replaceState(null, '', currentQuery || location.pathname);
       clearTimeout(pollTimer);
       loadStats().catch(showError);
     }
@@ -454,6 +456,9 @@
     document.getElementById('refresh-btn').addEventListener('click', triggerRefresh);
     document.getElementById('params-form').addEventListener('submit', applyParams);
     document.getElementById('f-countall').addEventListener('change', syncUserField);
+    // Start from the parameters carried in the page URL, if any; the form is
+    // then filled from the parameters the server echoes back.
+    currentQuery = window.location.search;
     loadStats().catch(showError);
   </script>
 </body>
