@@ -97,7 +97,8 @@ Then open http://localhost:8080 in a browser. The page shows at-a-glance
 highlights (longest/current streak, most active day and hour, busiest day,
 average commit size, top contributor share), the commit
 calendar, weekly commits-over-time and lines-changed (additions/deletions)
-trends, commits by weekday and by hour, the contributors ranking with a
+trends, commits by weekday and by hour plus a weekday×hour punchcard, the
+contributors ranking with a
 contribution-share chart, a breakdown of changes by language / file type, and a
 breakdown of commits by Conventional Commits type (feat, fix, …). The raw data
 is available as JSON on `http://localhost:8080/api/stats`. Author identities

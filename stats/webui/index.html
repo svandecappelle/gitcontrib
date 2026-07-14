@@ -113,6 +113,12 @@
     .legend { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; margin-top: 10px; }
     .legend .cell { width: 11px; height: 11px; flex: none; }
 
+    /* Punchcard (weekday x hour) */
+    .punch { display: grid; grid-template-columns: auto repeat(24, 1fr); gap: 3px; align-items: center; overflow-x: auto; }
+    .punch-hour { font-size: 10px; color: var(--muted); text-align: center; }
+    .punch-day { font-size: 11px; color: var(--muted); padding-right: 8px; text-align: right; white-space: nowrap; }
+    .punch-cell { aspect-ratio: 1; border-radius: 2px; background: var(--hm0); min-width: 8px; }
+
     /* Contributors */
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
@@ -300,6 +306,29 @@
         legend.appendChild(el('div', { class: 'cell', style: `background:${c}` })));
       legend.appendChild(document.createTextNode('More'));
       return el('div', {}, [cal, legend]);
+    }
+
+    // punchcardChart draws a weekday x hour grid heatmap from a [7][24] matrix
+    // (rows Monday-first).
+    function punchcardChart(matrix) {
+      const wdNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const grid = el('div', { class: 'punch' });
+      grid.appendChild(el('div', {}));  // top-left corner
+      for (let h = 0; h < 24; h++) {
+        grid.appendChild(el('div', { class: 'punch-hour' }, h % 2 === 0 ? String(h) : ''));
+      }
+      for (let d = 0; d < 7; d++) {
+        grid.appendChild(el('div', { class: 'punch-day' }, wdNames[d]));
+        for (let h = 0; h < 24; h++) {
+          const count = (matrix[d] || [])[h] || 0;
+          grid.appendChild(el('div', {
+            class: 'punch-cell',
+            title: `${wdNames[d]} ${String(h).padStart(2, '0')}:00 — ${count} commit${count === 1 ? '' : 's'}`,
+            style: `background:${heatColor(count)}`,
+          }));
+        }
+      }
+      return grid;
     }
 
     // donutChart draws a donut from items of the form {label, value}.
@@ -739,6 +768,10 @@
         panel('Commits by weekday', barChart(data.commitsByWeekday, weekdayLabels)),
         panel('Commits by hour', barChart(data.commitsByHour, hourLabels)),
       ])));
+
+      if (data.punchcard) {
+        app.appendChild(el('section', {}, panel('Punchcard (weekday × hour)', punchcardChart(data.punchcard))));
+      }
 
       const contribs = data.contributors || [];
       if (contribs.length) {

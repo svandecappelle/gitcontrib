@@ -59,6 +59,7 @@ type AggregatedStats struct {
 	Errors           int               `json:"errors"`
 	CommitsByHour    [24]int           `json:"commitsByHour"`    // index 0..23
 	CommitsByWeekday [7]int            `json:"commitsByWeekday"` // Monday-first
+	Punchcard        [7][24]int        `json:"punchcard"`        // [weekday Monday-first][hour]
 	Repositories     []RepositoryStat  `json:"repositories"`
 	Contributors     []Contributor     `json:"contributors"`
 	Languages        []Language        `json:"languages"`
@@ -130,6 +131,11 @@ func Aggregate(results []*StatsResult) AggregatedStats {
 		}
 		for i, v := range l.HoursCommits {
 			agg.CommitsByHour[i] += v
+		}
+		for i := 0; i < 7; i++ {
+			for h := 0; h < 24; h++ {
+				agg.Punchcard[(i+6)%7][h] += l.Punchcard[i][h]
+			}
 		}
 		for author, c := range l.AuthorsEditions {
 			e := editions[author]

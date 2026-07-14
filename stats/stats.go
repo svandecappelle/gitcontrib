@@ -44,6 +44,7 @@ type StatsResult struct {
 	LanguageEditions map[string]map[string]int
 	CommitTypes      map[string]int
 	DayEditions      map[int][2]int // day index -> [additions, deletions]
+	Punchcard        [7][24]int     // [weekday (0=Sunday)][hour] -> commit count
 	Error            error
 }
 
@@ -350,6 +351,7 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 			r.HoursCommits[hour] = r.HoursCommits[hour] + 1
 			r.DayCommits[day] = r.DayCommits[day] + 1
 			r.CommitTypes[commitType(c.Message)]++
+			r.Punchcard[day][hour]++
 		}
 		_ = bar.Add(1)
 		return nil
