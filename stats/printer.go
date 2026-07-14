@@ -148,10 +148,10 @@ func (p StatsResultConsolePrinter) getCell(val int, date time.Time) string {
 	switch {
 	case val == 0:
 		str = "  - "
-	case val >= 10:
-		str = " %d "
 	case val >= 100:
 		str = "%d "
+	case val >= 10:
+		str = " %d "
 	}
 
 	cellContent := str

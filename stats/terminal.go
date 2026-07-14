@@ -25,27 +25,22 @@ var (
 func colorize(c TermStyle, s string, oType OutputType) string {
 	switch oType {
 	case Dashboard:
-		if len(c.Attributes) > 0 {
-
-			var cType string
-			var cValue string
-
-			switch c.Attributes[0] {
-			case color.FgGreen:
-				cType = "fg"
-				cValue = "green"
-			case color.FgMagenta:
-				cType = "fg"
-				cValue = "magenta"
-			case color.FgRed:
-				cValue = "red"
-			case color.FgYellow:
-				cType = "fg"
-				cValue = "red"
-			}
-			if cType != "" {
-				return fmt.Sprintf("[%s](%s:%s)", s, cType, cValue)
-			}
+		if len(c.Attributes) == 0 {
+			return s
+		}
+		var cValue string
+		switch c.Attributes[0] {
+		case color.FgGreen:
+			cValue = "green"
+		case color.FgMagenta:
+			cValue = "magenta"
+		case color.FgRed:
+			cValue = "red"
+		case color.FgYellow:
+			cValue = "yellow"
+		}
+		if cValue != "" {
+			return fmt.Sprintf("[%s](fg:%s)", s, cValue)
 		}
 		return s
 	default:
