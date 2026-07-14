@@ -31,12 +31,30 @@
       padding: 24px 32px;
       border-bottom: 1px solid var(--border);
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 16px;
       flex-wrap: wrap;
     }
     header h1 { margin: 0; font-size: 20px; }
     header .sub { color: var(--muted); font-size: 13px; }
+    header .titles { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+    header .controls { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+    button {
+      background: var(--accent);
+      color: #fff;
+      border: 0;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+    }
+    button:hover:not(:disabled) { background: #58a6ff; }
+    button:disabled { opacity: .6; cursor: default; }
+    .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: middle; background: var(--add); }
+    .dot.stale { background: var(--del); }
+    .dot.refreshing { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
     main { padding: 24px 32px; max-width: 1200px; margin: 0 auto; }
     .grid { display: grid; gap: 20px; }
     .cards { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
@@ -84,8 +102,14 @@
 </head>
 <body>
   <header>
-    <h1>gitcontrib</h1>
-    <span class="sub" id="scan-info">loading…</span>
+    <div class="titles">
+      <h1>gitcontrib</h1>
+      <span class="sub" id="scan-info">loading…</span>
+    </div>
+    <div class="controls">
+      <span class="sub" id="cache-info"></span>
+      <button id="refresh-btn" type="button">Refresh</button>
+    </div>
   </header>
   <main id="app">
     <p class="msg">Loading statistics…</p>
@@ -213,9 +237,61 @@
       return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
     }
 
+    function relativeTime(iso) {
+      const secs = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
+      if (secs < 60) return 'just now';
+      if (secs < 3600) return Math.floor(secs / 60) + ' min ago';
+      if (secs < 86400) return Math.floor(secs / 3600) + ' h ago';
+      return Math.floor(secs / 86400) + ' d ago';
+    }
+
+    function updateStatusBar(data) {
+      const btn = document.getElementById('refresh-btn');
+      btn.disabled = !!data.refreshing;
+      btn.textContent = data.refreshing ? 'Refreshing…' : 'Refresh';
+
+      let cls = 'dot';
+      if (data.refreshing) cls += ' refreshing';
+      else if (data.stale) cls += ' stale';
+      const state = data.refreshing ? 'refreshing' : (data.stale ? 'stale' : 'up to date');
+      document.getElementById('cache-info').innerHTML =
+        `<span class="${cls}"></span>updated ${relativeTime(data.updatedAt)} · ${state}`;
+    }
+
+    let pollTimer = null;
+    function scheduleAutoRefreshCheck(data) {
+      clearTimeout(pollTimer);
+      // Keep polling while a background refresh is running, then render fresh data.
+      if (data.refreshing) {
+        pollTimer = setTimeout(() => loadStats().catch(showError), 2000);
+      }
+    }
+
+    function loadStats() {
+      return fetch('api/stats')
+        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+        .then(data => { render(data); return data; });
+    }
+
+    function triggerRefresh() {
+      const btn = document.getElementById('refresh-btn');
+      btn.disabled = true;
+      btn.textContent = 'Refreshing…';
+      fetch('api/refresh', { method: 'POST' })
+        .then(() => loadStats())
+        .catch(showError);
+    }
+
+    function showError(err) {
+      document.getElementById('app').innerHTML =
+        '<p class="msg">Failed to load statistics: ' + err.message + '</p>';
+    }
+
     function render(data) {
       document.getElementById('scan-info').textContent =
         `${data.user} · ${fmtDate(data.beginOfScan)} → ${fmtDate(data.endOfScan)}`;
+      updateStatusBar(data);
+      scheduleAutoRefreshCheck(data);
 
       const app = document.getElementById('app');
       app.innerHTML = '';
@@ -262,13 +338,8 @@
       }
     }
 
-    fetch('api/stats')
-      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(render)
-      .catch(err => {
-        document.getElementById('app').innerHTML =
-          '<p class="msg">Failed to load statistics: ' + err.message + '</p>';
-      });
+    document.getElementById('refresh-btn').addEventListener('click', triggerRefresh);
+    loadStats().catch(showError);
   </script>
 </body>
 </html>

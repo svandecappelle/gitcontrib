@@ -114,6 +114,16 @@ func commands() []*cli.Command {
 					Value: ":8080",
 					Usage: "Address the web server listens on (host:port)",
 				},
+				&cli.StringFlag{
+					Name:  "ttl",
+					Value: "5m",
+					Usage: "Cache time-to-live before a background refresh (e.g. 30s, 5m, 1h; 0 disables auto-refresh)",
+				},
+				&cli.StringFlag{
+					Name:  "cache-file",
+					Value: "",
+					Usage: "Path to the JSON cache file (default: <home>/.gitcontrib-cache.json)",
+				},
 			),
 		},
 		{
@@ -224,7 +234,28 @@ func runWeb(c *cli.Context) error {
 		return err
 	}
 	opts.Merge = c.Bool("merge")
-	return stats.Serve(opts, c.String("addr"))
+
+	ttl, err := time.ParseDuration(c.String("ttl"))
+	if err != nil {
+		return fmt.Errorf("invalid --ttl value: %w", err)
+	}
+
+	cacheFile := c.String("cache-file")
+	if cacheFile == "" {
+		cacheFile = defaultCacheFile()
+	}
+
+	return stats.Serve(opts, c.String("addr"), ttl, cacheFile)
+}
+
+// defaultCacheFile returns the default web cache path, in the user's home
+// directory, falling back to the current directory if the home is unknown.
+func defaultCacheFile() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "gitcontrib-cache.json"
+	}
+	return filepath.Join(home, ".gitcontrib-cache.json")
 }
 
 func addToScan(folder string) error {

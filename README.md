@@ -96,9 +96,25 @@ gitcontrib web interface listening on http://localhost:8080
 Then open http://localhost:8080 in a browser. The page shows the commit
 calendar, commits by weekday and by hour, the contributors ranking and a
 contribution-share chart. The raw data is available as JSON on
-`http://localhost:8080/api/stats`. The `web` command accepts the same flags as
-`dashboard` (`--weeks`, `--delta`, `--count-all`, `--merge`,
-`--file-include-pattern`, `--file-exclude-pattern`).
+`http://localhost:8080/api/stats`.
+
+The statistics are scanned once at startup and cached to a JSON file. Each
+request is served from the cache; once the cache is older than the TTL it is
+still served immediately while a refresh runs in the background
+(stale-while-revalidate). A refresh can also be forced with the "Refresh"
+button in the UI or by calling `POST /api/refresh`.
+
+```
+gitcontribution web --ttl 10m --cache-file /path/to/cache.json
+```
+
+- `--addr` address to listen on (default `:8080`)
+- `--ttl` cache lifetime before a background refresh, e.g. `30s`, `5m`, `1h`; `0` disables auto-refresh (default `5m`)
+- `--cache-file` JSON cache path (default `<home>/.gitcontrib-cache.json`)
+
+The `web` command also accepts the same filtering flags as `dashboard`
+(`--weeks`, `--delta`, `--count-all`, `--merge`, `--file-include-pattern`,
+`--file-exclude-pattern`).
 
 You can also add multiple repositories to scan each time you launch the command `gitcontribution stat` and you are not in a repository folder with
 `gitcontribution add-repository <dir>`
