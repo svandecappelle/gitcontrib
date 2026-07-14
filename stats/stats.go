@@ -289,8 +289,8 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 
 		// TODO find a solution for improve perf
 		stats, _ := c.Stats()
-		ignore := false
 		for _, stat := range stats {
+			ignore := false
 			for _, re := range excludeRegexps {
 				if re.MatchString(stat.Name) {
 					ignore = true

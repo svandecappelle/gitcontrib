@@ -97,12 +97,12 @@ func aggregateResults(results []*StatsResult) dashboardData {
 }
 
 // buildContributions returns the pie-chart data and the colored contributor
-// lines for the list widget. Contributor lines are sorted by total
-// contribution (descending); the pie data keeps the map iteration order.
+// lines for the list widget. Both are sorted by total contribution
+// (descending) and share the same order, so the pie slice colors line up with
+// the contributor list colors.
 func buildContributions(authors map[string][]float64) (pieData []float64, lines []string) {
 	var sorted []Contributions
 	for author, c := range authors {
-		pieData = append(pieData, c[0]+c[1])
 		sorted = append(sorted, Contributions{
 			Author:    author,
 			Additions: int(c[0]),
@@ -113,6 +113,7 @@ func buildContributions(authors map[string][]float64) (pieData []float64, lines 
 		return sorted[i].Total() > sorted[j].Total()
 	})
 	for colorIdx, a := range sorted {
+		pieData = append(pieData, float64(a.Total()))
 		lines = append(lines, a.Str(pieColors[colorIdx%len(pieColors)]))
 	}
 	return pieData, lines
