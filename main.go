@@ -16,20 +16,46 @@ import (
 )
 
 func getUserFromGitConfig() (*string, *string, error) {
-	user, _ := user.Current()
-	// don't forget to handle error!
-	gitconfig := filepath.Join(user.HomeDir, ".gitconfig")
+	usr, err := user.Current()
+	if err != nil {
+		return nil, nil, err
+	}
+	gitconfig := filepath.Join(usr.HomeDir, ".gitconfig")
 	bytes, _ := os.ReadFile(gitconfig)
 
 	config, _, err := goconfig.Parse(bytes)
 	if err != nil {
-		// Note: config is non-nil and contains successfully parsed values
-		log.Fatalf("Error on git config file: %s\n", err)
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("error on git config file: %w", err)
 	}
 	username := config["user.name"]
 	usermail := config["user.email"]
 	return &username, &usermail, nil
+}
+
+// statFlags returns the flags shared by the "stat" and "dashboard" commands.
+func statFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringFlag{
+			Name:  "delta",
+			Value: "",
+			Usage: "Delta of starting watch commits",
+		},
+		&cli.IntFlag{
+			Name:  "weeks",
+			Value: -1,
+			Usage: "Number of weeks to compute",
+		},
+		&cli.BoolFlag{
+			Name:  "merge",
+			Value: false,
+			Usage: "Merge all scanned repository",
+		},
+		&cli.BoolFlag{
+			Name:  "count-all",
+			Value: false,
+			Usage: "Force count all users contributions",
+		},
+	}
 }
 
 func commands() []*cli.Command {
@@ -73,27 +99,7 @@ func commands() []*cli.Command {
 			Action: func(c *cli.Context) error {
 				return argParse(c, true)
 			},
-			Flags: []cli.Flag{
-				&cli.StringFlag{
-					Name:  "delta",
-					Value: "",
-					Usage: "Delta of starting watch commits",
-				},
-				&cli.IntFlag{
-					Name:  "weeks",
-					Value: -1,
-					Usage: "Number of weeks to compute",
-				},
-				&cli.BoolFlag{
-					Name:  "merge",
-					Value: false,
-					Usage: "Merge all scanned repository",
-				},
-				&cli.BoolFlag{
-					Name:  "count-all",
-					Value: false,
-					Usage: "Force count all users contributions",
-				},
+			Flags: append(statFlags(),
 				&cli.StringSliceFlag{
 					Name:  "file-exclude-pattern",
 					Usage: "File pattern to exclude of contributions statistics",
@@ -102,7 +108,7 @@ func commands() []*cli.Command {
 					Name:  "file-include-pattern",
 					Usage: "File pattern to include of contributions statistics",
 				},
-			},
+			),
 		},
 		{
 			Name:    "stat",
@@ -111,28 +117,7 @@ func commands() []*cli.Command {
 			Action: func(c *cli.Context) error {
 				return argParse(c, false)
 			},
-			Flags: []cli.Flag{
-				&cli.StringFlag{
-					Name:  "delta",
-					Value: "",
-					Usage: "Delta of starting watch commits",
-				},
-				&cli.IntFlag{
-					Name:  "weeks",
-					Value: -1,
-					Usage: "Number of weeks to compute",
-				},
-				&cli.BoolFlag{
-					Name:  "merge",
-					Value: false,
-					Usage: "Merge all scanned repository",
-				},
-				&cli.BoolFlag{
-					Name:  "count-all",
-					Value: false,
-					Usage: "Force count all users contributions",
-				},
-			},
+			Flags: statFlags(),
 		},
 	}
 }
@@ -222,17 +207,16 @@ func addToScan(folder string) error {
 
 func main() {
 	var app = &cli.App{
-		Name:     "gitcontribution",
-		Version:  "v1.5.0",
-		Compiled: time.Now(),
-		Commands: commands(),
+		Name:                 "gitcontribution",
+		Version:              "v1.5.0",
+		Compiled:             time.Now(),
+		Commands:             commands(),
+		EnableBashCompletion: true,
 		Action: func(c *cli.Context) error {
 			return argParse(c, false)
 		},
 	}
-	err := app.Run(os.Args)
-	app.EnableBashCompletion = true
-	if err != nil {
+	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
 }
