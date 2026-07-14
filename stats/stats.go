@@ -116,58 +116,50 @@ func Launch(opts LaunchOptions) []*StatsResult {
 	return results
 }
 
-func populateDurationInDays(options LaunchOptions, r *StatsResult) {
-	nowDate := time.Now()
-	end := nowDate
-
-	delta := options.Delta
-	switch {
-	case strings.Contains(delta, "y"):
-		value, err := strconv.Atoi(strings.Split(delta, "y")[0])
-		if err != nil {
-			r.Error = errors.New("error delta is not a number")
-			return
-		}
-		if value > 0 {
-			value = -value
-		}
-		end = nowDate.AddDate(value, 0, 0)
-	case strings.Contains(delta, "m"):
-		value, err := strconv.Atoi(strings.Split(delta, "m")[0])
-		if err != nil {
-			r.Error = errors.New("error delta is not a number")
-			return
-		}
-		if value > 0 {
-			value = -value
-		}
-		end = nowDate.AddDate(0, value, 0)
-	case strings.Contains(delta, "w"):
-		value, err := strconv.Atoi(strings.Split(delta, "w")[0])
-		if err != nil {
-			r.Error = errors.New("error delta is not a number")
-			return
-		}
-		if value > 0 {
-			value = -value
-		}
-		end = nowDate.AddDate(0, 0, value*7)
-	case strings.Contains(delta, "d"):
-		value, err := strconv.Atoi(strings.Split(delta, "d")[0])
-		if err != nil {
-			r.Error = errors.New("error delta is not a number")
-			return
-		}
-		if value > 0 {
-			value = -value
-		}
-		end = nowDate.AddDate(0, 0, value)
-	default:
-		if delta != "" {
-			r.Error = errors.New("invalid delta value use the format: <int>[y/m/w/d]")
-			return
-		}
+// parseDelta interprets a delta string of the form "<int>[y|m|w|d]" and returns
+// `from` shifted back by that amount (years, months, weeks or days). An empty
+// delta returns `from` unchanged. The sign of the amount is ignored: the shift
+// always goes into the past.
+func parseDelta(delta string, from time.Time) (time.Time, error) {
+	if delta == "" {
+		return from, nil
 	}
+
+	unit := delta[len(delta)-1]
+	switch unit {
+	case 'y', 'm', 'w', 'd':
+		// recognised unit, value is parsed below
+	default:
+		return from, errors.New("invalid delta value use the format: <int>[y/m/w/d]")
+	}
+
+	value, err := strconv.Atoi(delta[:len(delta)-1])
+	if err != nil {
+		return from, errors.New("error delta is not a number")
+	}
+	if value > 0 {
+		value = -value
+	}
+
+	switch unit {
+	case 'y':
+		return from.AddDate(value, 0, 0), nil
+	case 'm':
+		return from.AddDate(0, value, 0), nil
+	case 'w':
+		return from.AddDate(0, 0, value*7), nil
+	default: // 'd'
+		return from.AddDate(0, 0, value), nil
+	}
+}
+
+func populateDurationInDays(options LaunchOptions, r *StatsResult) {
+	end, err := parseDelta(options.Delta, time.Now())
+	if err != nil {
+		r.Error = err
+		return
+	}
+
 	durationInDays := DefaultDurationInDays
 	if options.DurationInWeeks > 0 {
 		durationInDays = options.DurationInWeeks * 7
