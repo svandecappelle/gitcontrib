@@ -93,10 +93,10 @@
     .bar-wrap:hover .bar { background: #58a6ff; }
 
     /* Calendar heatmap */
-    .cal { display: grid; grid-template-rows: repeat(7, 13px); grid-auto-flow: column; grid-auto-columns: 13px; gap: 3px; overflow-x: auto; padding-bottom: 6px; }
-    .cell { width: 13px; height: 13px; border-radius: 2px; background: var(--hm0); }
+    .cal { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; grid-auto-columns: minmax(13px, 1fr); gap: 3px; width: 100%; height: 148px; overflow-x: auto; padding-bottom: 6px; }
+    .cell { border-radius: 2px; background: var(--hm0); }
     .legend { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; margin-top: 10px; }
-    .legend .cell { width: 11px; height: 11px; }
+    .legend .cell { width: 11px; height: 11px; flex: none; }
 
     /* Contributors */
     table { width: 100%; border-collapse: collapse; }
