@@ -55,6 +55,11 @@
     .dot.stale { background: var(--del); }
     .dot.refreshing { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+    .spinner { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--border); border-top-color: var(--accent); animation: spin .7s linear infinite; display: inline-block; vertical-align: middle; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .msg .spinner { margin-right: 8px; }
+    main { transition: opacity .2s ease; }
+    body.busy main { opacity: .4; pointer-events: none; }
 
     /* Parameters form */
     #params-panel { padding: 16px 32px; border-bottom: 1px solid var(--border); background: var(--panel); }
@@ -130,6 +135,7 @@
       <span class="sub" id="scan-info">loading…</span>
     </div>
     <div class="controls">
+      <span id="loader" class="spinner" style="display:none"></span>
       <span class="sub" id="cache-info"></span>
       <button id="refresh-btn" type="button">Refresh</button>
     </div>
@@ -170,7 +176,7 @@
   </section>
 
   <main id="app">
-    <p class="msg">Loading statistics…</p>
+    <p class="msg"><span class="spinner"></span>Analyzing commits…</p>
   </main>
 
   <script>
@@ -335,22 +341,34 @@
       }
     }
 
+    // setBusy shows the loader and dims the content while an analysis runs.
+    function setBusy(busy) {
+      document.body.classList.toggle('busy', busy);
+      document.getElementById('loader').style.display = busy ? 'inline-block' : 'none';
+    }
+
     function loadStats() {
+      setBusy(true);
       return fetch('api/stats' + currentQuery)
         .then(r => {
           if (!r.ok) return r.text().then(t => { throw new Error(t.trim() || ('HTTP ' + r.status)); });
           return r.json();
         })
-        .then(data => { render(data); return data; });
+        .then(
+          // Keep the loader on while a background refresh is still running.
+          data => { render(data); setBusy(!!data.refreshing); return data; },
+          err => { setBusy(false); throw err; }
+        );
     }
 
     function triggerRefresh() {
       const btn = document.getElementById('refresh-btn');
       btn.disabled = true;
       btn.textContent = 'Refreshing…';
+      setBusy(true);
       fetch('api/refresh' + currentQuery, { method: 'POST' })
         .then(() => loadStats())
-        .catch(showError);
+        .catch(err => { setBusy(false); showError(err); });
     }
 
     // Build the query string from the parameters form.
