@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>gitcontrib · statistics</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #2f81f7;
+      --add: #3fb950;
+      --del: #f85149;
+      --hm0: #161b22;
+      --hm1: #0e4429;
+      --hm2: #006d32;
+      --hm3: #26a641;
+      --hm4: #39d353;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    header {
+      padding: 24px 32px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    header h1 { margin: 0; font-size: 20px; }
+    header .sub { color: var(--muted); font-size: 13px; }
+    main { padding: 24px 32px; max-width: 1200px; margin: 0 auto; }
+    .grid { display: grid; gap: 20px; }
+    .cards { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+    .panels { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+    .card, .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+    .card .value { font-size: 30px; font-weight: 600; }
+    .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    .panel h2 { margin: 0 0 16px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    section { margin-top: 24px; }
+
+    /* Bar charts */
+    .bars { display: flex; align-items: flex-end; gap: 4px; height: 160px; }
+    .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+    .bar { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; transition: height .3s; }
+    .bar-label { font-size: 10px; color: var(--muted); white-space: nowrap; }
+    .bar-wrap:hover .bar { background: #58a6ff; }
+
+    /* Calendar heatmap */
+    .cal { display: grid; grid-template-rows: repeat(7, 13px); grid-auto-flow: column; grid-auto-columns: 13px; gap: 3px; overflow-x: auto; padding-bottom: 6px; }
+    .cell { width: 13px; height: 13px; border-radius: 2px; background: var(--hm0); }
+    .legend { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; margin-top: 10px; }
+    .legend .cell { width: 11px; height: 11px; }
+
+    /* Contributors */
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); font-size: 13px; }
+    th { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    .add { color: var(--add); }
+    .del { color: var(--del); }
+    .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: middle; }
+
+    .donut-wrap { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+    .donut-legend { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+    .donut-legend div { display: flex; align-items: center; }
+
+    .msg { color: var(--muted); padding: 40px; text-align: center; }
+    a { color: var(--accent); }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>gitcontrib</h1>
+    <span class="sub" id="scan-info">loading…</span>
+  </header>
+  <main id="app">
+    <p class="msg">Loading statistics…</p>
+  </main>
+
+  <script>
+    const PALETTE = ['#f85149', '#3fb950', '#d29922', '#2f81f7', '#bc8cff', '#39c5cf', '#e6edf3'];
+
+    function el(tag, attrs = {}, children = []) {
+      const e = document.createElement(tag);
+      for (const [k, v] of Object.entries(attrs)) {
+        if (k === 'class') e.className = v;
+        else if (k === 'style') e.style.cssText = v;
+        else if (k === 'html') e.innerHTML = v;
+        else e.setAttribute(k, v);
+      }
+      for (const c of [].concat(children)) {
+        if (c == null) continue;
+        e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+      }
+      return e;
+    }
+
+    function card(value, label) {
+      return el('div', { class: 'card' }, [
+        el('div', { class: 'value' }, String(value)),
+        el('div', { class: 'label' }, label),
+      ]);
+    }
+
+    function barChart(data, labels) {
+      const max = Math.max(1, ...data);
+      const bars = data.map((v, i) => el('div', { class: 'bar-wrap', title: `${labels[i]}: ${v}` }, [
+        el('div', { class: 'bar', style: `height:${(v / max) * 100}%` }),
+        el('div', { class: 'bar-label' }, labels[i]),
+      ]));
+      return el('div', { class: 'bars' }, bars);
+    }
+
+    function heatColor(count) {
+      if (count <= 0) return 'var(--hm0)';
+      if (count < 3) return 'var(--hm1)';
+      if (count < 6) return 'var(--hm2)';
+      if (count < 10) return 'var(--hm3)';
+      return 'var(--hm4)';
+    }
+
+    function calendar(days) {
+      const cal = el('div', { class: 'cal' });
+      days.forEach((d, i) => {
+        const cell = el('div', {
+          class: 'cell',
+          title: `${d.date}: ${d.count} commit${d.count === 1 ? '' : 's'}`,
+          style: `background:${heatColor(d.count)}`,
+        });
+        // Offset the first cell to its weekday row (grid rows are Sunday-first).
+        if (i === 0) cell.style.gridRowStart = d.weekday + 1;
+        cal.appendChild(cell);
+      });
+      const legend = el('div', { class: 'legend' }, ['Less']);
+      ['var(--hm0)', 'var(--hm1)', 'var(--hm2)', 'var(--hm3)', 'var(--hm4)'].forEach(c =>
+        legend.appendChild(el('div', { class: 'cell', style: `background:${c}` })));
+      legend.appendChild(document.createTextNode('More'));
+      return el('div', {}, [cal, legend]);
+    }
+
+    function contributorsTable(contribs) {
+      const rows = contribs.map((c, i) => el('tr', {}, [
+        el('td', {}, [
+          el('span', { class: 'swatch', style: `background:${PALETTE[i % PALETTE.length]}` }),
+          c.author,
+        ]),
+        el('td', { class: 'num add' }, `+${c.additions}`),
+        el('td', { class: 'num del' }, `-${c.deletions}`),
+        el('td', { class: 'num' }, String(c.total)),
+      ]));
+      const head = el('tr', {}, [
+        el('th', {}, 'Contributor'),
+        el('th', { class: 'num' }, 'Additions'),
+        el('th', { class: 'num' }, 'Deletions'),
+        el('th', { class: 'num' }, 'Total'),
+      ]);
+      return el('table', {}, [el('thead', {}, head), el('tbody', {}, rows)]);
+    }
+
+    function donut(contribs) {
+      const total = contribs.reduce((s, c) => s + c.total, 0);
+      const NS = 'http://www.w3.org/2000/svg';
+      const size = 160, r = 60, cx = size / 2, cy = size / 2;
+      const circ = 2 * Math.PI * r;
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('width', size);
+      svg.setAttribute('height', size);
+      svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+      let offset = 0;
+      contribs.forEach((c, i) => {
+        if (total <= 0) return;
+        const frac = c.total / total;
+        const seg = document.createElementNS(NS, 'circle');
+        seg.setAttribute('cx', cx);
+        seg.setAttribute('cy', cy);
+        seg.setAttribute('r', r);
+        seg.setAttribute('fill', 'none');
+        seg.setAttribute('stroke', PALETTE[i % PALETTE.length]);
+        seg.setAttribute('stroke-width', 24);
+        seg.setAttribute('stroke-dasharray', `${frac * circ} ${circ - frac * circ}`);
+        seg.setAttribute('stroke-dashoffset', -offset);
+        seg.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+        svg.appendChild(seg);
+        offset += frac * circ;
+      });
+      const legend = el('div', { class: 'donut-legend' },
+        contribs.map((c, i) => el('div', {}, [
+          el('span', { class: 'swatch', style: `background:${PALETTE[i % PALETTE.length]}` }),
+          `${c.author} (${c.total})`,
+        ])));
+      return el('div', { class: 'donut-wrap' }, [svg, legend]);
+    }
+
+    function panel(title, body) {
+      return el('div', { class: 'panel' }, [el('h2', {}, title), body]);
+    }
+
+    function fmtDate(iso) {
+      return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function render(data) {
+      document.getElementById('scan-info').textContent =
+        `${data.user} · ${fmtDate(data.beginOfScan)} → ${fmtDate(data.endOfScan)}`;
+
+      const app = document.getElementById('app');
+      app.innerHTML = '';
+
+      if (data.totalCommits === 0) {
+        app.appendChild(el('p', { class: 'msg' }, 'No commits found to parse.'));
+        return;
+      }
+
+      app.appendChild(el('div', { class: 'grid cards' }, [
+        card(data.totalCommits, 'Commits'),
+        card(data.analyzedRepos, 'Repositories'),
+        card((data.contributors || []).length, 'Contributors'),
+        card(data.durationInDays, 'Days scanned'),
+      ]));
+
+      app.appendChild(el('section', {}, panel('Commit activity', calendar(data.calendar || []))));
+
+      const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const hourLabels = Array.from({ length: 24 }, (_, i) => String(i));
+      app.appendChild(el('section', {}, el('div', { class: 'grid panels' }, [
+        panel('Commits by weekday', barChart(data.commitsByWeekday, weekdayLabels)),
+        panel('Commits by hour', barChart(data.commitsByHour, hourLabels)),
+      ])));
+
+      const contribs = data.contributors || [];
+      if (contribs.length) {
+        app.appendChild(el('section', {}, el('div', { class: 'grid panels' }, [
+          panel('Contributors', contributorsTable(contribs)),
+          panel('Contribution share', donut(contribs)),
+        ])));
+      }
+
+      const repos = data.repositories || [];
+      if (repos.length) {
+        const list = el('table', {}, [
+          el('thead', {}, el('tr', {}, [el('th', {}, 'Repository'), el('th', { class: 'num' }, 'Commits')])),
+          el('tbody', {}, repos.map(r => el('tr', {}, [
+            el('td', {}, r.folder),
+            el('td', { class: 'num' }, String(r.commits)),
+          ]))),
+        ]);
+        app.appendChild(el('section', {}, panel('Repositories', list)));
+      }
+    }
+
+    fetch('api/stats')
+      .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(render)
+      .catch(err => {
+        document.getElementById('app').innerHTML =
+          '<p class="msg">Failed to load statistics: ' + err.message + '</p>';
+      });
+  </script>
+</body>
+</html>

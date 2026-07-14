@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"sort"
 
 	ui "github.com/gizak/termui/v3"
 	"github.com/gizak/termui/v3/widgets"
@@ -15,16 +14,8 @@ import (
 // the same order, for the committers pie chart.
 var pieColors = []string{"red", "green", "yellow", "blue", "magenta", "cyan", "white"}
 
-type Contributions struct {
-	Author    string
-	Additions int
-	Deletions int
-}
-
-func (c Contributions) Total() int {
-	return c.Additions + c.Deletions
-}
-func (c Contributions) Str(color string) string {
+// contributorLine renders a contributor as a colored termui markup row.
+func contributorLine(c Contributor, color string) string {
 	return fmt.Sprintf(
 		"[%s](fg:%s): [+%d](fg:green):[-%d](fg:red)",
 		c.Author,
@@ -34,125 +25,56 @@ func (c Contributions) Str(color string) string {
 	)
 }
 
-// dashboardData holds the values aggregated across every scanned repository,
-// ready to be fed to the dashboard widgets.
-type dashboardData struct {
-	nbCommits  int
-	nbAnalyzed int
-	nbErrors   int
-	hoursData  []float64
-	daysData   []float64
-	authors    map[string][]float64 // author -> [additions, deletions]
-	repoLines  []string             // "folder: commitCount" for repos with commits
-	merged     StatsResult          // all repositories merged into a single result
-}
-
-// aggregateResults sums the per-repository results into a single dashboardData.
-func aggregateResults(results []*StatsResult) dashboardData {
-	d := dashboardData{
-		hoursData: make([]float64, 24),
-		daysData:  make([]float64, 7),
-		authors:   make(map[string][]float64),
-		merged: StatsResult{
-			Options:        results[0].Options,
-			BeginOfScan:    results[0].BeginOfScan,
-			EndOfScan:      results[0].EndOfScan,
-			DurationInDays: results[0].DurationInDays,
-			Commits:        make(map[int]int),
-		},
-	}
-
-	for _, l := range results {
-		if l.Error != nil {
-			d.nbErrors++
-			continue
-		}
-		d.nbAnalyzed++
-
-		commitsByRepo := 0
-		for i, commit := range l.Commits {
-			d.nbCommits += commit
-			commitsByRepo += commit
-			d.merged.Commits[i] += commit
-		}
-		if commitsByRepo > 0 {
-			d.repoLines = append(d.repoLines, fmt.Sprintf("%s: %d", l.Folder, commitsByRepo))
-		}
-
-		for i, v := range l.DayCommits {
-			d.daysData[(i+6)%7] += float64(v)
-		}
-		for i, v := range l.HoursCommits {
-			d.hoursData[i] += float64(v)
-		}
-		for author, c := range l.AuthorsEditions {
-			if d.authors[author] == nil {
-				d.authors[author] = make([]float64, 2)
-			}
-			d.authors[author][0] += float64(c["additions"])
-			d.authors[author][1] += float64(c["deletions"])
-		}
-	}
-	return d
-}
-
-// buildContributions returns the pie-chart data and the colored contributor
-// lines for the list widget. Both are sorted by total contribution
-// (descending) and share the same order, so the pie slice colors line up with
-// the contributor list colors.
-func buildContributions(authors map[string][]float64) (pieData []float64, lines []string) {
-	var sorted []Contributions
-	for author, c := range authors {
-		sorted = append(sorted, Contributions{
-			Author:    author,
-			Additions: int(c[0]),
-			Deletions: int(c[1]),
-		})
-	}
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].Total() > sorted[j].Total()
-	})
-	for colorIdx, a := range sorted {
-		pieData = append(pieData, float64(a.Total()))
-		lines = append(lines, a.Str(pieColors[colorIdx%len(pieColors)]))
-	}
-	return pieData, lines
-}
-
 func OpenDashboard(opts LaunchOptions) {
 	width, height, _ := term.GetSize(0)
 	rLaunch := Launch(opts)
 
-	data := aggregateResults(rLaunch)
+	agg := Aggregate(rLaunch)
 
-	if data.nbCommits == 0 {
+	if agg.TotalCommits == 0 {
 		fmt.Println("\nNo commits found to parse")
 		return
 	}
-	if data.nbErrors == len(rLaunch) {
+	if agg.Errors == len(rLaunch) {
 		panic("Launch has only errors")
 	}
 
-	pieData, contribLines := buildContributions(data.authors)
+	// Pie data and contributor lines share the sorted contributor order, so
+	// slice colors line up with the list colors.
+	pieData := make([]float64, 0, len(agg.Contributors))
+	contribLines := make([]string, 0, len(agg.Contributors))
+	for i, c := range agg.Contributors {
+		pieData = append(pieData, float64(c.Total))
+		contribLines = append(contribLines, contributorLine(c, pieColors[i%len(pieColors)]))
+	}
+
+	repoLines := make([]string, 0, len(agg.Repositories))
+	for _, r := range agg.Repositories {
+		repoLines = append(repoLines, fmt.Sprintf("%s: %d", r.Folder, r.Commits))
+	}
+
+	hoursData := make([]float64, 24)
+	for i, v := range agg.CommitsByHour {
+		hoursData[i] = float64(v)
+	}
+	daysData := make([]float64, 7)
+	for i, v := range agg.CommitsByWeekday {
+		daysData[i] = float64(v)
+	}
 
 	if err := ui.Init(); err != nil {
 		log.Fatalf("failed to initialize termui: %v", err)
 	}
 	defer ui.Close()
 
-	user := "all"
-	if rLaunch[0].Options.EmailOrUsername != nil {
-		user = *rLaunch[0].Options.EmailOrUsername
-	}
-
 	p := widgets.NewList()
 	p.Title = "Global statistics"
 	p.Rows = []string{
-		fmt.Sprintf("BeginDate: %s", rLaunch[0].BeginOfScan),
-		fmt.Sprintf("EndDate: %s", rLaunch[0].EndOfScan),
-		fmt.Sprintf("Commits: %d", data.nbCommits),
-		fmt.Sprintf("Analyzed repos: %d", data.nbAnalyzed),
-		fmt.Sprintf("User analyzed: %s", user),
+		fmt.Sprintf("BeginDate: %s", agg.BeginOfScan),
+		fmt.Sprintf("EndDate: %s", agg.EndOfScan),
+		fmt.Sprintf("Commits: %d", agg.TotalCommits),
+		fmt.Sprintf("Analyzed repos: %d", agg.AnalyzedRepos),
+		fmt.Sprintf("User analyzed: %s", agg.User),
 	}
 	p.SetRect(0, 0, width/3, height/3)
 
@@ -161,7 +83,7 @@ func OpenDashboard(opts LaunchOptions) {
 	bc.SetRect(0, height*2/3, width/4, height)
 	bc.Labels = []string{"Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"}
 	bc.BarGap = 0
-	bc.Data = data.daysData
+	bc.Data = daysData
 	bc.BarWidth = int(width / 7 / 4)
 
 	hoursLabels := make([]string, 24)
@@ -172,7 +94,7 @@ func OpenDashboard(opts LaunchOptions) {
 	hoursGraph.Title = "Commits on daytime"
 	hoursGraph.SetRect(0, height/3, width, height*2/3)
 	hoursGraph.BarWidth = int(width / 12 / 2)
-	hoursGraph.Data = data.hoursData
+	hoursGraph.Data = hoursData
 	hoursGraph.Labels = hoursLabels
 	hoursGraph.BarGap = 0
 
@@ -193,7 +115,7 @@ func OpenDashboard(opts LaunchOptions) {
 
 	foldersStats := widgets.NewList()
 	foldersStats.Title = "Repositories"
-	foldersStats.Rows = data.repoLines
+	foldersStats.Rows = repoLines
 	foldersStats.SetRect(width/4, height/3*2, width/2, height)
 
 	heatmap := widgets.NewParagraph()
@@ -204,7 +126,7 @@ func OpenDashboard(opts LaunchOptions) {
 	if defaultDurationTruncated > rLaunch[0].Options.DurationParamInWeeks {
 		defaultDurationTruncated = rLaunch[0].Options.DurationParamInWeeks
 	}
-	heatmap.Text = StatsResultConsolePrinter{Dashboard}.print(&data.merged, defaultDurationTruncated)
+	heatmap.Text = StatsResultConsolePrinter{Dashboard}.print(agg.merged, defaultDurationTruncated)
 
 	ui.Render(p, bc, hoursGraph, contribGraph, contributors, foldersStats, heatmap)
 

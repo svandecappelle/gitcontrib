@@ -82,6 +82,24 @@ Show all users contributions of repository
 gitcontribution stat --count-all
 ```
 
+Open an interactive terminal dashboard (heatmap, per-weekday and per-hour
+charts, contributors and repositories)
+```
+gitcontribution dashboard
+```
+
+Share the statistics over HTTP through a JSON API and a web UI
+```
+gitcontribution web --addr :8080
+gitcontrib web interface listening on http://localhost:8080
+```
+Then open http://localhost:8080 in a browser. The page shows the commit
+calendar, commits by weekday and by hour, the contributors ranking and a
+contribution-share chart. The raw data is available as JSON on
+`http://localhost:8080/api/stats`. The `web` command accepts the same flags as
+`dashboard` (`--weeks`, `--delta`, `--count-all`, `--merge`,
+`--file-include-pattern`, `--file-exclude-pattern`).
+
 You can also add multiple repositories to scan each time you launch the command `gitcontribution stat` and you are not in a repository folder with
 `gitcontribution add-repository <dir>`
 

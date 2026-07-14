@@ -97,16 +97,22 @@ func commands() []*cli.Command {
 			Aliases: []string{},
 			Usage:   "Open a dashboard for print statistics",
 			Action: func(c *cli.Context) error {
-				return argParse(c, true)
+				return runDashboard(c)
 			},
-			Flags: append(statFlags(),
-				&cli.StringSliceFlag{
-					Name:  "file-exclude-pattern",
-					Usage: "File pattern to exclude of contributions statistics",
-				},
-				&cli.StringSliceFlag{
-					Name:  "file-include-pattern",
-					Usage: "File pattern to include of contributions statistics",
+			Flags: append(statFlags(), patternFlags()...),
+		},
+		{
+			Name:    "web",
+			Aliases: []string{"w"},
+			Usage:   "Start a web server exposing the statistics through an API and a UI",
+			Action: func(c *cli.Context) error {
+				return runWeb(c)
+			},
+			Flags: append(append(statFlags(), patternFlags()...),
+				&cli.StringFlag{
+					Name:  "addr",
+					Value: ":8080",
+					Usage: "Address the web server listens on (host:port)",
 				},
 			),
 		},
@@ -115,90 +121,110 @@ func commands() []*cli.Command {
 			Aliases: []string{"s"},
 			Usage:   "Email or Name: your@email.com / 'Firstname Name' - show constribution statistics of a user",
 			Action: func(c *cli.Context) error {
-				return argParse(c, false)
+				return runStat(c)
 			},
 			Flags: statFlags(),
 		},
 	}
 }
 
-func argParse(c *cli.Context, useDashboard bool) error {
-	var folders []string
-	var weeks *int = nil
-	var user *string = nil
-	var err error
-
-	if c.Int("weeks") > 0 {
-		weeksParam := c.Int("weeks")
-		weeks = &weeksParam
+// patternFlags returns the include/exclude file-pattern flags shared by the
+// commands that filter contributions.
+func patternFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.StringSliceFlag{
+			Name:  "file-exclude-pattern",
+			Usage: "File pattern to exclude of contributions statistics",
+		},
+		&cli.StringSliceFlag{
+			Name:  "file-include-pattern",
+			Usage: "File pattern to include of contributions statistics",
+		},
 	}
+}
 
-	if c.NArg() > 0 {
-		argNum := 0
-		for argNum < c.NArg() {
-			arg := c.Args().Get(argNum)
-			if _, err := os.Stat(arg); err == nil {
-				folders = append(folders, arg)
-			} else if errors.Is(err, os.ErrNotExist) {
-				user = &arg
-			}
-			argNum += 1
+// buildLaunchOptions resolves the folders, user and scan duration shared by the
+// stat, dashboard and web commands. When console is true the scan window is
+// derived from (and validated against) the terminal width; otherwise it
+// defaults to one year, or the --weeks flag when provided.
+func buildLaunchOptions(c *cli.Context, console bool) (stats.LaunchOptions, error) {
+	var folders []string
+	var user *string
+
+	for i := 0; i < c.NArg(); i++ {
+		arg := c.Args().Get(i)
+		if _, err := os.Stat(arg); err == nil {
+			folders = append(folders, arg)
+		} else if errors.Is(err, os.ErrNotExist) {
+			value := arg
+			user = &value
 		}
 	}
+
 	if user == nil && !c.Bool("count-all") {
 		_, gitEmail, err := getUserFromGitConfig()
 		if err != nil {
-			panic(err)
+			return stats.LaunchOptions{}, err
 		}
 		user = gitEmail
 	}
 
 	if len(folders) == 0 {
-		folders, err = stats.GetFolders()
+		found, err := stats.GetFolders()
 		if err != nil {
-			return err
+			return stats.LaunchOptions{}, err
 		}
+		folders = found
 	}
 
-	durationInWeeks := 0
 	width, _, _ := term.GetSize(0)
-
-	durationInWeeks = 52
-	if weeks != nil {
-		if width < (4**weeks)+16 && !useDashboard {
-			return errors.New("too much data to display in this terminal width")
+	durationInWeeks := 52
+	if weeks := c.Int("weeks"); weeks > 0 {
+		if console && width < (4*weeks)+16 {
+			return stats.LaunchOptions{}, errors.New("too much data to display in this terminal width")
 		}
-		durationInWeeks = *weeks
-	} else {
-		defaultDuration := (width - 16) / 4
-		if !useDashboard {
-			durationInWeeks = defaultDuration
-		}
+		durationInWeeks = weeks
+	} else if console {
+		durationInWeeks = (width - 16) / 4
 	}
 
-	if useDashboard {
-		stats.OpenDashboard(stats.LaunchOptions{
-			User:             user,
-			DurationInWeeks:  durationInWeeks,
-			Folders:          folders,
-			Merge:            false,
-			Delta:            c.String("delta"),
-			Dashboard:        true,
-			PatternToExclude: c.StringSlice("file-exclude-pattern"),
-			PatternToInclude: c.StringSlice("file-include-pattern"),
-		})
-	} else {
-		stats.Launch(stats.LaunchOptions{
-			User:            user,
-			DurationInWeeks: durationInWeeks,
-			Folders:         folders,
-			Merge:           c.Bool("merge"),
-			Delta:           c.String("delta"),
-			Dashboard:       false,
-		})
-	}
+	return stats.LaunchOptions{
+		User:             user,
+		DurationInWeeks:  durationInWeeks,
+		Folders:          folders,
+		Delta:            c.String("delta"),
+		PatternToExclude: c.StringSlice("file-exclude-pattern"),
+		PatternToInclude: c.StringSlice("file-include-pattern"),
+	}, nil
+}
 
-	return err
+func runStat(c *cli.Context) error {
+	opts, err := buildLaunchOptions(c, true)
+	if err != nil {
+		return err
+	}
+	opts.Merge = c.Bool("merge")
+	stats.Launch(opts)
+	return nil
+}
+
+func runDashboard(c *cli.Context) error {
+	opts, err := buildLaunchOptions(c, false)
+	if err != nil {
+		return err
+	}
+	opts.Dashboard = true
+	stats.OpenDashboard(opts)
+	return nil
+}
+
+func runWeb(c *cli.Context) error {
+	opts, err := buildLaunchOptions(c, false)
+	if err != nil {
+		return err
+	}
+	opts.Merge = c.Bool("merge")
+	return stats.Serve(opts, c.String("addr"))
 }
 
 func addToScan(folder string) error {
@@ -213,7 +239,7 @@ func main() {
 		Commands:             commands(),
 		EnableBashCompletion: true,
 		Action: func(c *cli.Context) error {
-			return argParse(c, false)
+			return runStat(c)
 		},
 	}
 	if err := app.Run(os.Args); err != nil {
