@@ -3,6 +3,7 @@ package stats
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"sync"
@@ -130,14 +131,35 @@ func (c *statsCache) persist() {
 // scan runs a full analysis for the given options and stores the result under
 // its key.
 func (c *statsCache) scan(key string, opts LaunchOptions) {
-	entry := &cacheEntry{
-		Stats:     Aggregate(Launch(opts)),
-		UpdatedAt: time.Now(),
-	}
+	start := time.Now()
+	log.Printf("Analyzing commits (%s)", describeOpts(opts))
+
+	stats := Aggregate(Launch(opts))
+	entry := &cacheEntry{Stats: stats, UpdatedAt: time.Now()}
 	c.mu.Lock()
 	c.entries[key] = entry
 	c.mu.Unlock()
 	c.persist()
+
+	log.Printf("Analysis done (%s): %d commits, %d contributors in %s",
+		describeOpts(opts), stats.TotalCommits, len(stats.Contributors),
+		time.Since(start).Round(time.Millisecond))
+}
+
+// describeOpts summarizes a set of launch options for logging.
+func describeOpts(o LaunchOptions) string {
+	user := "all users"
+	if o.User != nil {
+		user = *o.User
+	}
+	desc := fmt.Sprintf("user=%s, weeks=%d, folders=%d", user, o.DurationInWeeks, len(o.Folders))
+	if o.Delta != "" {
+		desc += ", delta=" + o.Delta
+	}
+	if o.Merge {
+		desc += ", merged"
+	}
+	return desc
 }
 
 // refreshInBackground starts a scan in a goroutine unless one is already
