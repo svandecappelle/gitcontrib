@@ -29,6 +29,12 @@ type Language struct {
 	Total     int    `json:"total"`
 }
 
+// CommitTypeCount is the number of commits of a given Conventional Commits type.
+type CommitTypeCount struct {
+	Type  string `json:"type"`
+	Count int    `json:"count"`
+}
+
 // DayCount is the number of commits on a single calendar day.
 type DayCount struct {
 	Date    string `json:"date"`    // YYYY-MM-DD
@@ -39,19 +45,20 @@ type DayCount struct {
 // AggregatedStats is the whole set of statistics merged across every scanned
 // repository, ready to be serialized as JSON or fed to the terminal dashboard.
 type AggregatedStats struct {
-	User             string           `json:"user"`
-	BeginOfScan      time.Time        `json:"beginOfScan"`
-	EndOfScan        time.Time        `json:"endOfScan"`
-	DurationInDays   int              `json:"durationInDays"`
-	TotalCommits     int              `json:"totalCommits"`
-	AnalyzedRepos    int              `json:"analyzedRepos"`
-	Errors           int              `json:"errors"`
-	CommitsByHour    [24]int          `json:"commitsByHour"`    // index 0..23
-	CommitsByWeekday [7]int           `json:"commitsByWeekday"` // Monday-first
-	Repositories     []RepositoryStat `json:"repositories"`
-	Contributors     []Contributor    `json:"contributors"`
-	Languages        []Language       `json:"languages"`
-	Calendar         []DayCount       `json:"calendar"`
+	User             string            `json:"user"`
+	BeginOfScan      time.Time         `json:"beginOfScan"`
+	EndOfScan        time.Time         `json:"endOfScan"`
+	DurationInDays   int               `json:"durationInDays"`
+	TotalCommits     int               `json:"totalCommits"`
+	AnalyzedRepos    int               `json:"analyzedRepos"`
+	Errors           int               `json:"errors"`
+	CommitsByHour    [24]int           `json:"commitsByHour"`    // index 0..23
+	CommitsByWeekday [7]int            `json:"commitsByWeekday"` // Monday-first
+	Repositories     []RepositoryStat  `json:"repositories"`
+	Contributors     []Contributor     `json:"contributors"`
+	Languages        []Language        `json:"languages"`
+	CommitTypes      []CommitTypeCount `json:"commitTypes"`
+	Calendar         []DayCount        `json:"calendar"`
 
 	// merged keeps the underlying merged result so the terminal dashboard can
 	// reuse the same commit map for its heatmap. Not serialized.
@@ -84,6 +91,7 @@ func Aggregate(results []*StatsResult) AggregatedStats {
 
 	editions := make(map[string][2]int)     // author -> [additions, deletions]
 	langEditions := make(map[string][2]int) // language -> [additions, deletions]
+	commitTypes := make(map[string]int)     // conventional type -> count
 
 	for _, l := range results {
 		if l.Error != nil {
@@ -123,6 +131,9 @@ func Aggregate(results []*StatsResult) AggregatedStats {
 			e[1] += c["deletions"]
 			langEditions[lang] = e
 		}
+		for t, n := range l.CommitTypes {
+			commitTypes[t] += n
+		}
 	}
 
 	for author, e := range editions {
@@ -147,6 +158,13 @@ func Aggregate(results []*StatsResult) AggregatedStats {
 	}
 	sort.Slice(agg.Languages, func(i, j int) bool {
 		return agg.Languages[i].Total > agg.Languages[j].Total
+	})
+
+	for t, n := range commitTypes {
+		agg.CommitTypes = append(agg.CommitTypes, CommitTypeCount{Type: t, Count: n})
+	}
+	sort.Slice(agg.CommitTypes, func(i, j int) bool {
+		return agg.CommitTypes[i].Count > agg.CommitTypes[j].Count
 	})
 
 	agg.Calendar = buildCalendar(merged)

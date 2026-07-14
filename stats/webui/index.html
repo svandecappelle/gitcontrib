@@ -303,6 +303,23 @@
       return scrollable(el('table', {}, [el('thead', {}, head), el('tbody', {}, body)]));
     }
 
+    // countTable builds a scrollable two-column table (label + count) with a
+    // colored swatch matching the donut segments.
+    function countTable(rows, labelHeader, countHeader, labelOf, countOf) {
+      const body = rows.map((row, i) => el('tr', {}, [
+        el('td', {}, [
+          el('span', { class: 'swatch', style: `background:${PALETTE[i % PALETTE.length]}` }),
+          labelOf(row),
+        ]),
+        el('td', { class: 'num' }, String(countOf(row))),
+      ]));
+      const head = el('tr', {}, [
+        el('th', {}, labelHeader),
+        el('th', { class: 'num' }, countHeader),
+      ]);
+      return scrollable(el('table', {}, [el('thead', {}, head), el('tbody', {}, body)]));
+    }
+
     function panel(title, body) {
       return el('div', { class: 'panel' }, [el('h2', {}, title), body]);
     }
@@ -488,6 +505,14 @@
         app.appendChild(el('section', {}, el('div', { class: 'grid panels' }, [
           panel('Languages', editionsTable(langs, 'Language', l => l.name)),
           panel('Language share', donutChart(langs.map(l => ({ label: l.name, value: l.total })))),
+        ])));
+      }
+
+      const types = data.commitTypes || [];
+      if (types.length) {
+        app.appendChild(el('section', {}, el('div', { class: 'grid panels' }, [
+          panel('Commit types', countTable(types, 'Type', 'Commits', t => t.type, t => t.count)),
+          panel('Commit type share', donutChart(types.map(t => ({ label: t.type, value: t.count })))),
         ])));
       }
 

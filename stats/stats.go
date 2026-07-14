@@ -42,6 +42,7 @@ type StatsResult struct {
 	DayCommits       [7]int
 	AuthorsEditions  map[string]map[string]int
 	LanguageEditions map[string]map[string]int
+	CommitTypes      map[string]int
 	Error            error
 }
 
@@ -341,6 +342,7 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 			r.Commits[daysAgo] = r.Commits[daysAgo] + 1
 			r.HoursCommits[hour] = r.HoursCommits[hour] + 1
 			r.DayCommits[day] = r.DayCommits[day] + 1
+			r.CommitTypes[commitType(c.Message)]++
 		}
 		_ = bar.Add(1)
 		return nil
@@ -361,6 +363,7 @@ func processRepositories(r *StatsResult, bar *progressbar.ProgressBar) error {
 	r.Commits = make(map[int]int, daysInMap)
 	r.AuthorsEditions = make(map[string]map[string]int)
 	r.LanguageEditions = make(map[string]map[string]int)
+	r.CommitTypes = make(map[string]int)
 	var errReturn error
 	for i := daysInMap; i > 0; i-- {
 		r.Commits[i] = 0

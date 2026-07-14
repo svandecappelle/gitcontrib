@@ -95,8 +95,9 @@ gitcontrib web interface listening on http://localhost:8080
 ```
 Then open http://localhost:8080 in a browser. The page shows the commit
 calendar, commits by weekday and by hour, the contributors ranking with a
-contribution-share chart, and a breakdown of changes by language / file type.
-The raw data is available as JSON on `http://localhost:8080/api/stats`.
+contribution-share chart, a breakdown of changes by language / file type, and a
+breakdown of commits by Conventional Commits type (feat, fix, …). The raw data
+is available as JSON on `http://localhost:8080/api/stats`.
 
 The UI has a parameters form to re-run the analysis on the fly (number of
 weeks, delta, a specific user or all users, merge, include/exclude patterns).
