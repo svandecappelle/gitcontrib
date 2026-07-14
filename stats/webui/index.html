@@ -61,10 +61,11 @@
     #params-form { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; width: 100%; }
     .field { display: flex; flex-direction: column; gap: 4px; }
     .field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-    .field input[type=text], .field input[type=number] {
+    .field input[type=text], .field input[type=number], .field select {
       background: var(--bg); color: var(--text); border: 1px solid var(--border);
       border-radius: 6px; padding: 7px 9px; font-size: 13px;
     }
+    .field select { min-width: 180px; }
     .field input[type=number] { width: 90px; }
     .field.check { flex-direction: row; align-items: center; gap: 6px; height: 34px; }
     .field.check label { text-transform: none; font-size: 13px; letter-spacing: 0; color: var(--text); }
@@ -136,6 +137,10 @@
 
   <section id="params-panel">
     <form id="params-form">
+      <div class="field" id="repo-field" style="display:none">
+        <label for="f-repo">Repository</label>
+        <select id="f-repo"><option value="">All repositories</option></select>
+      </div>
       <div class="field">
         <label for="f-weeks">Weeks</label>
         <input type="number" id="f-weeks" min="1" max="520" />
@@ -151,10 +156,6 @@
       <div class="field check">
         <input type="checkbox" id="f-countall" />
         <label for="f-countall">All users</label>
-      </div>
-      <div class="field check">
-        <input type="checkbox" id="f-merge" />
-        <label for="f-merge">Merge repositories</label>
       </div>
       <div class="field">
         <label for="f-include">Include patterns</label>
@@ -357,12 +358,13 @@
       const val = id => document.getElementById(id).value.trim();
       const checked = id => document.getElementById(id).checked;
       const params = new URLSearchParams();
+      const repo = document.getElementById('f-repo').value;
+      if (repo) params.set('repo', repo);
       if (val('f-weeks')) params.set('weeks', val('f-weeks'));
       if (val('f-delta')) params.set('delta', val('f-delta'));
       const countAll = checked('f-countall');
       if (!countAll && val('f-user')) params.set('user', val('f-user'));
       params.set('countAll', countAll ? 'true' : 'false');
-      params.set('merge', checked('f-merge') ? 'true' : 'false');
       if (val('f-include')) params.set('include', val('f-include'));
       if (val('f-exclude')) params.set('exclude', val('f-exclude'));
       const s = params.toString();
@@ -370,17 +372,36 @@
     }
 
     // Fill the form with the server defaults once, then leave the user in control.
-    function populateForm(p) {
-      if (formInitialized || !p) return;
+    function populateForm(data) {
+      if (formInitialized || !data || !data.params) return;
       formInitialized = true;
+      const p = data.params;
+      populateRepoOptions(data.availableRepos || [], p.repo || '');
       document.getElementById('f-weeks').value = p.weeks || '';
       document.getElementById('f-delta').value = p.delta || '';
       document.getElementById('f-user').value = p.user || '';
       document.getElementById('f-countall').checked = !!p.countAll;
-      document.getElementById('f-merge').checked = !!p.merge;
       document.getElementById('f-include').value = (p.include || []).join(', ');
       document.getElementById('f-exclude').value = (p.exclude || []).join(', ');
       syncUserField();
+    }
+
+    // Build the repository dropdown; hidden when there is only one repository.
+    function populateRepoOptions(repos, selected) {
+      const field = document.getElementById('repo-field');
+      if (repos.length < 2) {
+        field.style.display = 'none';
+        return;
+      }
+      field.style.display = '';
+      const sel = document.getElementById('f-repo');
+      sel.innerHTML = '';
+      sel.appendChild(el('option', { value: '' }, 'All repositories'));
+      repos.forEach(r => {
+        const name = r.split('/').filter(Boolean).pop() || r;
+        sel.appendChild(el('option', { value: r, title: r }, name));
+      });
+      sel.value = selected;
     }
 
     function syncUserField() {
@@ -404,7 +425,7 @@
     function render(data) {
       document.getElementById('scan-info').textContent =
         `${data.user} · ${fmtDate(data.beginOfScan)} → ${fmtDate(data.endOfScan)}`;
-      populateForm(data.params);
+      populateForm(data);
       updateStatusBar(data);
       scheduleAutoRefreshCheck(data);
 
@@ -456,6 +477,8 @@
     document.getElementById('refresh-btn').addEventListener('click', triggerRefresh);
     document.getElementById('params-form').addEventListener('submit', applyParams);
     document.getElementById('f-countall').addEventListener('change', syncUserField);
+    // Selecting a repository applies immediately.
+    document.getElementById('f-repo').addEventListener('change', applyParams);
     // Start from the parameters carried in the page URL, if any; the form is
     // then filled from the parameters the server echoes back.
     currentQuery = window.location.search;

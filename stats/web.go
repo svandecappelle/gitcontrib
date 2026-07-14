@@ -22,6 +22,7 @@ type appliedParams struct {
 	User     string   `json:"user"`
 	CountAll bool     `json:"countAll"`
 	Merge    bool     `json:"merge"`
+	Repo     string   `json:"repo"`
 	Include  []string `json:"include"`
 	Exclude  []string `json:"exclude"`
 }
@@ -30,11 +31,12 @@ type appliedParams struct {
 // at the top level) enriched with cache metadata and the applied parameters.
 type statsResponse struct {
 	AggregatedStats
-	Params     appliedParams `json:"params"`
-	UpdatedAt  time.Time     `json:"updatedAt"`
-	Stale      bool          `json:"stale"`
-	Refreshing bool          `json:"refreshing"`
-	TTLSeconds float64       `json:"ttlSeconds"`
+	Params         appliedParams `json:"params"`
+	AvailableRepos []string      `json:"availableRepos"`
+	UpdatedAt      time.Time     `json:"updatedAt"`
+	Stale          bool          `json:"stale"`
+	Refreshing     bool          `json:"refreshing"`
+	TTLSeconds     float64       `json:"ttlSeconds"`
 }
 
 // Serve starts an HTTP server exposing the statistics as a JSON API on
@@ -95,7 +97,8 @@ func Serve(opts LaunchOptions, addr string, ttl time.Duration, cacheFile string)
 
 		writeJSON(w, statsResponse{
 			AggregatedStats: entry.Stats,
-			Params:          paramsOf(reqOpts),
+			Params:          cache.paramsOf(reqOpts),
+			AvailableRepos:  cache.baseOpts.Folders,
 			UpdatedAt:       entry.UpdatedAt,
 			Stale:           stale,
 			Refreshing:      refreshing,
@@ -134,6 +137,9 @@ func (c *statsCache) resolve(r *http.Request) (LaunchOptions, error) {
 	if _, err := parseDelta(params.Delta, time.Now()); err != nil {
 		return LaunchOptions{}, err
 	}
+	if params.Repo != "" && !containsFolder(c.baseOpts.Folders, params.Repo) {
+		return LaunchOptions{}, fmt.Errorf("unknown repository: %s", params.Repo)
+	}
 	return c.optsFor(params), nil
 }
 
@@ -144,6 +150,7 @@ func parseParams(r *http.Request) Params {
 		User:     q.Get("user"),
 		CountAll: isTrue(q.Get("countAll")),
 		Merge:    isTrue(q.Get("merge")),
+		Repo:     q.Get("repo"),
 		Include:  splitCSV(q.Get("include")),
 		Exclude:  splitCSV(q.Get("exclude")),
 	}
@@ -155,7 +162,7 @@ func parseParams(r *http.Request) Params {
 
 // paramsOf reports the parameters a set of options corresponds to, for echoing
 // back to the UI.
-func paramsOf(o LaunchOptions) appliedParams {
+func (c *statsCache) paramsOf(o LaunchOptions) appliedParams {
 	ap := appliedParams{
 		Weeks:   o.DurationInWeeks,
 		Delta:   o.Delta,
@@ -167,6 +174,10 @@ func paramsOf(o LaunchOptions) appliedParams {
 		ap.CountAll = true
 	} else {
 		ap.User = *o.User
+	}
+	// A single folder that is not the full configured set is a repo selection.
+	if len(o.Folders) == 1 && !sameFolders(o.Folders, c.baseOpts.Folders) {
+		ap.Repo = o.Folders[0]
 	}
 	return ap
 }

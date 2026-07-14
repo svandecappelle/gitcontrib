@@ -10,14 +10,15 @@ import (
 	"time"
 )
 
-// Params holds the analysis parameters a client can tweak. The set of scanned
-// folders is intentionally not exposed: it is fixed when the server starts.
+// Params holds the analysis parameters a client can tweak. New folders cannot
+// be introduced: Repo may only select one of the folders fixed at startup.
 type Params struct {
 	Weeks    int      // 0 keeps the server default
 	Delta    string   // "" means no offset
 	User     string   // "" means no user filter
 	CountAll bool     // analyze every user (ignores User)
 	Merge    bool     // merge all folders into a single result
+	Repo     string   // "" means all repositories; otherwise a single folder
 	Include  []string // file include patterns
 	Exclude  []string // file exclude patterns
 }
@@ -65,6 +66,13 @@ func (c *statsCache) optsFor(p Params) LaunchOptions {
 	opts.PatternToInclude = p.Include
 	opts.PatternToExclude = p.Exclude
 
+	// A specific repository restricts the scan to that single folder (its stats
+	// are then shown on their own, not grouped with the others).
+	if p.Repo != "" {
+		opts.Folders = []string{p.Repo}
+		opts.Merge = false
+	}
+
 	switch {
 	case p.CountAll || p.User == "":
 		opts.User = nil
@@ -82,7 +90,8 @@ func cacheKey(opts LaunchOptions) string {
 		user = *opts.User
 	}
 	return fmt.Sprintf(
-		"w=%d|d=%s|u=%s|m=%t|inc=%s|exc=%s",
+		"f=%s|w=%d|d=%s|u=%s|m=%t|inc=%s|exc=%s",
+		strings.Join(opts.Folders, ","),
 		opts.DurationInWeeks,
 		opts.Delta,
 		user,
@@ -90,6 +99,29 @@ func cacheKey(opts LaunchOptions) string {
 		strings.Join(opts.PatternToInclude, ","),
 		strings.Join(opts.PatternToExclude, ","),
 	)
+}
+
+// containsFolder reports whether folder is one of the folders.
+func containsFolder(folders []string, folder string) bool {
+	for _, f := range folders {
+		if f == folder {
+			return true
+		}
+	}
+	return false
+}
+
+// sameFolders reports whether two folder lists are identical (order included).
+func sameFolders(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 // load restores a previously persisted cache file, if any. A missing or
