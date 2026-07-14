@@ -85,8 +85,9 @@
     section { margin-top: 24px; }
 
     /* Bar charts */
-    .bars { display: flex; align-items: flex-end; gap: 4px; height: 160px; }
-    .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+    .bars { display: flex; align-items: stretch; gap: 4px; height: 180px; }
+    .bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; height: 100%; }
+    .bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; }
     .bar { width: 100%; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 2px; transition: height .3s; }
     .bar-label { font-size: 10px; color: var(--muted); white-space: nowrap; }
     .bar-wrap:hover .bar { background: #58a6ff; }
@@ -192,7 +193,9 @@
     function barChart(data, labels) {
       const max = Math.max(1, ...data);
       const bars = data.map((v, i) => el('div', { class: 'bar-wrap', title: `${labels[i]}: ${v}` }, [
-        el('div', { class: 'bar', style: `height:${(v / max) * 100}%` }),
+        el('div', { class: 'bar-track' }, [
+          el('div', { class: 'bar', style: `height:${(v / max) * 100}%` }),
+        ]),
         el('div', { class: 'bar-label' }, labels[i]),
       ]));
       return el('div', { class: 'bars' }, bars);
