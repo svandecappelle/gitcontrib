@@ -55,6 +55,20 @@
     .dot.stale { background: var(--del); }
     .dot.refreshing { background: var(--accent); animation: pulse 1s ease-in-out infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+
+    /* Parameters form */
+    #params-panel { padding: 16px 32px; border-bottom: 1px solid var(--border); background: var(--panel); }
+    #params-form { display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end; max-width: 1200px; margin: 0 auto; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .field input[type=text], .field input[type=number] {
+      background: var(--bg); color: var(--text); border: 1px solid var(--border);
+      border-radius: 6px; padding: 7px 9px; font-size: 13px;
+    }
+    .field input[type=number] { width: 90px; }
+    .field.check { flex-direction: row; align-items: center; gap: 6px; height: 34px; }
+    .field.check label { text-transform: none; font-size: 13px; letter-spacing: 0; color: var(--text); }
+    #params-form input:disabled { opacity: .5; }
     main { padding: 24px 32px; max-width: 1200px; margin: 0 auto; }
     .grid { display: grid; gap: 20px; }
     .cards { grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
@@ -111,6 +125,41 @@
       <button id="refresh-btn" type="button">Refresh</button>
     </div>
   </header>
+
+  <section id="params-panel">
+    <form id="params-form">
+      <div class="field">
+        <label for="f-weeks">Weeks</label>
+        <input type="number" id="f-weeks" min="1" max="520" />
+      </div>
+      <div class="field">
+        <label for="f-delta">Delta</label>
+        <input type="text" id="f-delta" placeholder="e.g. 1y, 6m, 2w" size="10" />
+      </div>
+      <div class="field">
+        <label for="f-user">User (name or email)</label>
+        <input type="text" id="f-user" placeholder="all users" size="24" />
+      </div>
+      <div class="field check">
+        <input type="checkbox" id="f-countall" />
+        <label for="f-countall">All users</label>
+      </div>
+      <div class="field check">
+        <input type="checkbox" id="f-merge" />
+        <label for="f-merge">Merge repositories</label>
+      </div>
+      <div class="field">
+        <label for="f-include">Include patterns</label>
+        <input type="text" id="f-include" placeholder="regex, comma-separated" size="20" />
+      </div>
+      <div class="field">
+        <label for="f-exclude">Exclude patterns</label>
+        <input type="text" id="f-exclude" placeholder="regex, comma-separated" size="20" />
+      </div>
+      <button id="apply-btn" type="submit">Apply</button>
+    </form>
+  </section>
+
   <main id="app">
     <p class="msg">Loading statistics…</p>
   </main>
@@ -259,6 +308,9 @@
     }
 
     let pollTimer = null;
+    let currentQuery = '';
+    let formInitialized = false;
+
     function scheduleAutoRefreshCheck(data) {
       clearTimeout(pollTimer);
       // Keep polling while a background refresh is running, then render fresh data.
@@ -268,8 +320,11 @@
     }
 
     function loadStats() {
-      return fetch('api/stats')
-        .then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      return fetch('api/stats' + currentQuery)
+        .then(r => {
+          if (!r.ok) return r.text().then(t => { throw new Error(t.trim() || ('HTTP ' + r.status)); });
+          return r.json();
+        })
         .then(data => { render(data); return data; });
     }
 
@@ -277,9 +332,51 @@
       const btn = document.getElementById('refresh-btn');
       btn.disabled = true;
       btn.textContent = 'Refreshing…';
-      fetch('api/refresh', { method: 'POST' })
+      fetch('api/refresh' + currentQuery, { method: 'POST' })
         .then(() => loadStats())
         .catch(showError);
+    }
+
+    // Build the query string from the parameters form.
+    function buildQuery() {
+      const val = id => document.getElementById(id).value.trim();
+      const checked = id => document.getElementById(id).checked;
+      const params = new URLSearchParams();
+      if (val('f-weeks')) params.set('weeks', val('f-weeks'));
+      if (val('f-delta')) params.set('delta', val('f-delta'));
+      const countAll = checked('f-countall');
+      if (!countAll && val('f-user')) params.set('user', val('f-user'));
+      params.set('countAll', countAll ? 'true' : 'false');
+      params.set('merge', checked('f-merge') ? 'true' : 'false');
+      if (val('f-include')) params.set('include', val('f-include'));
+      if (val('f-exclude')) params.set('exclude', val('f-exclude'));
+      const s = params.toString();
+      return s ? '?' + s : '';
+    }
+
+    // Fill the form with the server defaults once, then leave the user in control.
+    function populateForm(p) {
+      if (formInitialized || !p) return;
+      formInitialized = true;
+      document.getElementById('f-weeks').value = p.weeks || '';
+      document.getElementById('f-delta').value = p.delta || '';
+      document.getElementById('f-user').value = p.user || '';
+      document.getElementById('f-countall').checked = !!p.countAll;
+      document.getElementById('f-merge').checked = !!p.merge;
+      document.getElementById('f-include').value = (p.include || []).join(', ');
+      document.getElementById('f-exclude').value = (p.exclude || []).join(', ');
+      syncUserField();
+    }
+
+    function syncUserField() {
+      document.getElementById('f-user').disabled = document.getElementById('f-countall').checked;
+    }
+
+    function applyParams(e) {
+      e.preventDefault();
+      currentQuery = buildQuery();
+      clearTimeout(pollTimer);
+      loadStats().catch(showError);
     }
 
     function showError(err) {
@@ -290,6 +387,7 @@
     function render(data) {
       document.getElementById('scan-info').textContent =
         `${data.user} · ${fmtDate(data.beginOfScan)} → ${fmtDate(data.endOfScan)}`;
+      populateForm(data.params);
       updateStatusBar(data);
       scheduleAutoRefreshCheck(data);
 
@@ -339,6 +437,8 @@
     }
 
     document.getElementById('refresh-btn').addEventListener('click', triggerRefresh);
+    document.getElementById('params-form').addEventListener('submit', applyParams);
+    document.getElementById('f-countall').addEventListener('change', syncUserField);
     loadStats().catch(showError);
   </script>
 </body>

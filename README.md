@@ -98,11 +98,18 @@ calendar, commits by weekday and by hour, the contributors ranking and a
 contribution-share chart. The raw data is available as JSON on
 `http://localhost:8080/api/stats`.
 
-The statistics are scanned once at startup and cached to a JSON file. Each
-request is served from the cache; once the cache is older than the TTL it is
-still served immediately while a refresh runs in the background
+The UI has a parameters form to re-run the analysis on the fly (number of
+weeks, delta, a specific user or all users, merge, include/exclude patterns).
+The scanned folders are fixed when the server starts and cannot be changed from
+the UI. Each parameter set is scanned on first use and cached independently; the
+API accepts the same parameters as query string, e.g.
+`GET /api/stats?weeks=8&user=someone@example.com`.
+
+The statistics are scanned at startup and cached to a JSON file. Each request
+is served from the cache; once an entry is older than the TTL it is still
+served immediately while a refresh runs in the background
 (stale-while-revalidate). A refresh can also be forced with the "Refresh"
-button in the UI or by calling `POST /api/refresh`.
+button in the UI or by calling `POST /api/refresh` (with the same parameters).
 
 ```
 gitcontribution web --ttl 10m --cache-file /path/to/cache.json
