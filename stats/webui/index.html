@@ -104,6 +104,8 @@
     th { color: var(--muted); font-weight: 500; text-transform: uppercase; font-size: 11px; letter-spacing: .04em; }
     tbody tr { transition: background .15s ease; }
     tbody tr:hover { background: rgba(255, 255, 255, 0.05); }
+    .table-scroll { max-height: 340px; overflow-y: auto; }
+    thead th { position: sticky; top: 0; background: var(--panel); border-bottom: none; box-shadow: inset 0 -1px 0 var(--border); z-index: 1; }
     td.num { text-align: right; font-variant-numeric: tabular-nums; }
     .add { color: var(--add); }
     .del { color: var(--del); }
@@ -195,6 +197,12 @@
       ]);
     }
 
+    // scrollable wraps a table so it scrolls vertically past a max height while
+    // its header stays pinned (via sticky th).
+    function scrollable(node) {
+      return el('div', { class: 'table-scroll' }, [node]);
+    }
+
     function barChart(data, labels) {
       const max = Math.max(1, ...data);
       const bars = data.map((v, i) => el('div', { class: 'bar-wrap', title: `${labels[i]}: ${v}` }, [
@@ -249,7 +257,7 @@
         el('th', { class: 'num' }, 'Deletions'),
         el('th', { class: 'num' }, 'Total'),
       ]);
-      return el('table', {}, [el('thead', {}, head), el('tbody', {}, rows)]);
+      return scrollable(el('table', {}, [el('thead', {}, head), el('tbody', {}, rows)]));
     }
 
     function donut(contribs) {
@@ -439,7 +447,7 @@
             el('td', { class: 'num' }, String(r.commits)),
           ]))),
         ]);
-        app.appendChild(el('section', {}, panel('Repositories', list)));
+        app.appendChild(el('section', {}, panel('Repositories', scrollable(list))));
       }
     }
 
