@@ -58,51 +58,54 @@ func isRepo(path string) bool {
 	return err == nil
 }
 
+// compilePatterns compiles every pattern in the slice, returning an error as
+// soon as one of them is not a valid regular expression.
+func compilePatterns(patterns []string) ([]*regexp.Regexp, error) {
+	compiled := make([]*regexp.Regexp, 0, len(patterns))
+	for _, pattern := range patterns {
+		re, err := regexp.Compile(pattern)
+		if err != nil {
+			return nil, fmt.Errorf("invalid regex pattern %q: %w", pattern, err)
+		}
+		compiled = append(compiled, re)
+	}
+	return compiled, nil
+}
+
 // TODO use an interface object in order to refacto in same place the statistic run logic and then print results
 
 func Launch(opts LaunchOptions) []*StatsResult {
-	var results []*StatsResult = []*StatsResult{}
+	results := []*StatsResult{}
 	var wg sync.WaitGroup
 	bar := progressbar.Default(-1, "Analyzing commits")
 
+	// When merging, every folder is scanned into a single result; otherwise
+	// each folder is scanned independently.
+	var folderSets [][]string
 	if opts.Merge {
-		options := StatsOptions{
-			EmailOrUsername:      opts.User,
-			DurationParamInWeeks: opts.DurationInWeeks,
-			Folders:              opts.Folders,
-			Delta:                opts.Delta,
-			Silent:               opts.Dashboard,
-			PatternToExclude:     opts.PatternToExclude,
-			PatternToInclude:     opts.PatternToInclude,
-		}
-
-		r := &StatsResult{
-			Options: options,
-		}
-		populateDurationInDays(opts, r)
-
-		results = append(results, r)
-		wg.Add(1)
-		go Stats(r, &wg, bar)
+		folderSets = [][]string{opts.Folders}
 	} else {
 		for _, folder := range opts.Folders {
-			options := StatsOptions{
+			folderSets = append(folderSets, []string{folder})
+		}
+	}
+
+	for _, folders := range folderSets {
+		r := &StatsResult{
+			Options: StatsOptions{
 				EmailOrUsername:      opts.User,
 				DurationParamInWeeks: opts.DurationInWeeks,
-				Folders:              []string{folder},
+				Folders:              folders,
 				Delta:                opts.Delta,
 				Silent:               opts.Dashboard,
 				PatternToExclude:     opts.PatternToExclude,
 				PatternToInclude:     opts.PatternToInclude,
-			}
-			r := &StatsResult{
-				Options: options,
-			}
-			populateDurationInDays(opts, r)
-			results = append(results, r)
-			wg.Add(1)
-			go Stats(r, &wg, bar)
+			},
 		}
+		populateDurationInDays(opts, r)
+		results = append(results, r)
+		wg.Add(1)
+		go Stats(r, &wg, bar)
 	}
 	wg.Wait()
 
@@ -246,6 +249,17 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 		log.Fatalf("Cannot get repository history: %s", err)
 		return err
 	}
+	// Compile the include/exclude patterns once, up front, rather than for
+	// every commit stat as we iterate.
+	excludeRegexps, err := compilePatterns(r.Options.PatternToExclude)
+	if err != nil {
+		return err
+	}
+	includeRegexps, err := compilePatterns(r.Options.PatternToInclude)
+	if err != nil {
+		return err
+	}
+
 	// iterate the commits
 	offset := calcOffset(r.EndOfScan)
 	err = iterator.ForEach(func(c *object.Commit) error {
@@ -277,22 +291,14 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 		stats, _ := c.Stats()
 		ignore := false
 		for _, stat := range stats {
-			for _, pattern := range r.Options.PatternToExclude {
-				pR, eRegex := regexp.Compile(pattern)
-				if eRegex != nil {
-					log.Fatalf("Input regex is not valid")
-				}
-				if pR.MatchString(stat.Name) {
+			for _, re := range excludeRegexps {
+				if re.MatchString(stat.Name) {
 					ignore = true
 					break
 				}
 			}
-			for _, pattern := range r.Options.PatternToInclude {
-				pR, eRegex := regexp.Compile(pattern)
-				if eRegex != nil {
-					log.Fatalf("Input regex is not valid")
-				}
-				if !pR.MatchString(stat.Name) {
+			for _, re := range includeRegexps {
+				if !re.MatchString(stat.Name) {
 					ignore = true
 					continue
 				} else {
