@@ -88,6 +88,7 @@
     .card .value { font-size: 30px; font-weight: 600; }
     .card .label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
     .panel h2 { margin: 0 0 16px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .section-title { margin: 0 0 12px; font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
     section { margin-top: 24px; }
 
     /* Bar charts */
@@ -207,11 +208,54 @@
       return e;
     }
 
-    function card(value, label) {
-      return el('div', { class: 'card' }, [
+    function card(value, label, title) {
+      const c = el('div', { class: 'card' }, [
         el('div', { class: 'value' }, String(value)),
         el('div', { class: 'label' }, label),
       ]);
+      if (title) c.title = title;
+      return c;
+    }
+
+    function argmax(arr) {
+      let best = 0;
+      for (let i = 1; i < arr.length; i++) if (arr[i] > arr[best]) best = i;
+      return best;
+    }
+
+    // computeHighlights derives at-a-glance insight tiles from the response.
+    function computeHighlights(data) {
+      const cal = data.calendar || [];
+      let longest = 0, run = 0;
+      for (const d of cal) { run = d.count > 0 ? run + 1 : 0; if (run > longest) longest = run; }
+      // Current streak: count back from the last non-future day (the calendar
+      // extends to the end of the week, so trailing days may be in the future).
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      let end = cal.length - 1;
+      while (end >= 0 && cal[end].date > todayStr) end--;
+      let current = 0;
+      for (let i = end; i >= 0 && cal[i].count > 0; i--) current++;
+      let busiest = null;
+      for (const d of cal) if (d.count > 0 && (!busiest || d.count > busiest.count)) busiest = d;
+
+      const wd = data.commitsByWeekday || [], hr = data.commitsByHour || [];
+      const wdNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      const contribs = data.contributors || [];
+      const totalLines = contribs.reduce((s, c) => s + c.total, 0);
+      const days = n => `${n} day${n === 1 ? '' : 's'}`;
+
+      const tiles = [];
+      tiles.push(card(days(longest), 'Longest streak'));
+      tiles.push(card(days(current), 'Current streak'));
+      if (wd.length && wd[argmax(wd)] > 0) tiles.push(card(wdNames[argmax(wd)], 'Most active day'));
+      if (hr.length && hr[argmax(hr)] > 0) tiles.push(card(String(argmax(hr)).padStart(2, '0') + ':00', 'Peak hour'));
+      if (busiest) tiles.push(card(busiest.count, `Busiest day (${shortDate(busiest.date)})`, busiest.date));
+      if (data.totalCommits) tiles.push(card(Math.round(totalLines / data.totalCommits), 'Avg lines / commit'));
+      if (contribs.length && totalLines > 0) {
+        tiles.push(card(Math.round(contribs[0].total / totalLines * 100) + '%', 'Top contributor share', contribs[0].author));
+      }
+      return tiles;
     }
 
     // scrollable wraps a table so it scrolls vertically past a max height while
@@ -670,6 +714,11 @@
         card(data.analyzedRepos, 'Repositories'),
         card((data.contributors || []).length, 'Contributors'),
         card(data.durationInDays, 'Days scanned'),
+      ]));
+
+      app.appendChild(el('section', {}, [
+        el('h2', { class: 'section-title' }, 'Highlights'),
+        el('div', { class: 'grid cards' }, computeHighlights(data)),
       ]));
 
       app.appendChild(el('section', {}, panel('Commit activity', calendar(data.calendar || []))));

@@ -93,7 +93,9 @@ Share the statistics over HTTP through a JSON API and a web UI
 gitcontribution web --addr :8080
 gitcontrib web interface listening on http://localhost:8080
 ```
-Then open http://localhost:8080 in a browser. The page shows the commit
+Then open http://localhost:8080 in a browser. The page shows at-a-glance
+highlights (longest/current streak, most active day and hour, busiest day,
+average commit size, top contributor share), the commit
 calendar, weekly commits-over-time and lines-changed (additions/deletions)
 trends, commits by weekday and by hour, the contributors ranking with a
 contribution-share chart, a breakdown of changes by language / file type, and a
