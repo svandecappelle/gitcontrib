@@ -20,6 +20,15 @@ type RepositoryStat struct {
 	Commits int    `json:"commits"`
 }
 
+// Language is the amount of changes attributed to a programming language (or
+// file type), sorted-friendly and JSON-serializable.
+type Language struct {
+	Name      string `json:"name"`
+	Additions int    `json:"additions"`
+	Deletions int    `json:"deletions"`
+	Total     int    `json:"total"`
+}
+
 // DayCount is the number of commits on a single calendar day.
 type DayCount struct {
 	Date    string `json:"date"`    // YYYY-MM-DD
@@ -41,6 +50,7 @@ type AggregatedStats struct {
 	CommitsByWeekday [7]int           `json:"commitsByWeekday"` // Monday-first
 	Repositories     []RepositoryStat `json:"repositories"`
 	Contributors     []Contributor    `json:"contributors"`
+	Languages        []Language       `json:"languages"`
 	Calendar         []DayCount       `json:"calendar"`
 
 	// merged keeps the underlying merged result so the terminal dashboard can
@@ -72,7 +82,8 @@ func Aggregate(results []*StatsResult) AggregatedStats {
 		Commits:        make(map[int]int),
 	}
 
-	editions := make(map[string][2]int) // author -> [additions, deletions]
+	editions := make(map[string][2]int)     // author -> [additions, deletions]
+	langEditions := make(map[string][2]int) // language -> [additions, deletions]
 
 	for _, l := range results {
 		if l.Error != nil {
@@ -106,6 +117,12 @@ func Aggregate(results []*StatsResult) AggregatedStats {
 			e[1] += c["deletions"]
 			editions[author] = e
 		}
+		for lang, c := range l.LanguageEditions {
+			e := langEditions[lang]
+			e[0] += c["additions"]
+			e[1] += c["deletions"]
+			langEditions[lang] = e
+		}
 	}
 
 	for author, e := range editions {
@@ -118,6 +135,18 @@ func Aggregate(results []*StatsResult) AggregatedStats {
 	}
 	sort.Slice(agg.Contributors, func(i, j int) bool {
 		return agg.Contributors[i].Total > agg.Contributors[j].Total
+	})
+
+	for lang, e := range langEditions {
+		agg.Languages = append(agg.Languages, Language{
+			Name:      lang,
+			Additions: e[0],
+			Deletions: e[1],
+			Total:     e[0] + e[1],
+		})
+	}
+	sort.Slice(agg.Languages, func(i, j int) bool {
+		return agg.Languages[i].Total > agg.Languages[j].Total
 	})
 
 	agg.Calendar = buildCalendar(merged)

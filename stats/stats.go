@@ -32,16 +32,17 @@ type LaunchOptions struct {
 }
 
 type StatsResult struct {
-	Options         StatsOptions
-	BeginOfScan     time.Time
-	EndOfScan       time.Time
-	DurationInDays  int
-	Folder          string
-	Commits         map[int]int
-	HoursCommits    [24]int
-	DayCommits      [7]int
-	AuthorsEditions map[string]map[string]int
-	Error           error
+	Options          StatsOptions
+	BeginOfScan      time.Time
+	EndOfScan        time.Time
+	DurationInDays   int
+	Folder           string
+	Commits          map[int]int
+	HoursCommits     [24]int
+	DayCommits       [7]int
+	AuthorsEditions  map[string]map[string]int
+	LanguageEditions map[string]map[string]int
+	Error            error
 }
 
 type StatsOptions struct {
@@ -327,6 +328,13 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 			}
 			r.AuthorsEditions[c.Author.Name]["additions"] = r.AuthorsEditions[c.Author.Name]["additions"] + stat.Addition
 			r.AuthorsEditions[c.Author.Name]["deletions"] = r.AuthorsEditions[c.Author.Name]["deletions"] + stat.Deletion
+
+			lang := languageForFile(stat.Name)
+			if r.LanguageEditions[lang] == nil {
+				r.LanguageEditions[lang] = make(map[string]int, 2)
+			}
+			r.LanguageEditions[lang]["additions"] = r.LanguageEditions[lang]["additions"] + stat.Addition
+			r.LanguageEditions[lang]["deletions"] = r.LanguageEditions[lang]["deletions"] + stat.Deletion
 		}
 
 		if daysAgo <= r.DurationInDays {
@@ -352,6 +360,7 @@ func processRepositories(r *StatsResult, bar *progressbar.ProgressBar) error {
 
 	r.Commits = make(map[int]int, daysInMap)
 	r.AuthorsEditions = make(map[string]map[string]int)
+	r.LanguageEditions = make(map[string]map[string]int)
 	var errReturn error
 	for i := daysInMap; i > 0; i-- {
 		r.Commits[i] = 0

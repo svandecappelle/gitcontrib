@@ -248,27 +248,9 @@
       return el('div', {}, [cal, legend]);
     }
 
-    function contributorsTable(contribs) {
-      const rows = contribs.map((c, i) => el('tr', {}, [
-        el('td', {}, [
-          el('span', { class: 'swatch', style: `background:${PALETTE[i % PALETTE.length]}` }),
-          c.author,
-        ]),
-        el('td', { class: 'num add' }, `+${c.additions}`),
-        el('td', { class: 'num del' }, `-${c.deletions}`),
-        el('td', { class: 'num' }, String(c.total)),
-      ]));
-      const head = el('tr', {}, [
-        el('th', {}, 'Contributor'),
-        el('th', { class: 'num' }, 'Additions'),
-        el('th', { class: 'num' }, 'Deletions'),
-        el('th', { class: 'num' }, 'Total'),
-      ]);
-      return scrollable(el('table', {}, [el('thead', {}, head), el('tbody', {}, rows)]));
-    }
-
-    function donut(contribs) {
-      const total = contribs.reduce((s, c) => s + c.total, 0);
+    // donutChart draws a donut from items of the form {label, value}.
+    function donutChart(items) {
+      const total = items.reduce((s, it) => s + it.value, 0);
       const NS = 'http://www.w3.org/2000/svg';
       const size = 160, r = 60, cx = size / 2, cy = size / 2;
       const circ = 2 * Math.PI * r;
@@ -276,9 +258,9 @@
       svg.setAttribute('class', 'donut');
       svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
       let offset = 0;
-      contribs.forEach((c, i) => {
+      items.forEach((it, i) => {
         if (total <= 0) return;
-        const frac = c.total / total;
+        const frac = it.value / total;
         const seg = document.createElementNS(NS, 'circle');
         seg.setAttribute('cx', cx);
         seg.setAttribute('cy', cy);
@@ -293,11 +275,32 @@
         offset += frac * circ;
       });
       const legend = el('div', { class: 'donut-legend' },
-        contribs.map((c, i) => el('div', { title: `${c.author} (${c.total})` }, [
+        items.map((it, i) => el('div', { title: `${it.label} (${it.value})` }, [
           el('span', { class: 'swatch', style: `background:${PALETTE[i % PALETTE.length]}` }),
-          el('span', {}, `${c.author} (${c.total})`),
+          el('span', {}, `${it.label} (${it.value})`),
         ])));
       return el('div', { class: 'donut-wrap' }, [svg, legend]);
+    }
+
+    // editionsTable builds a scrollable +/- table from rows that expose a label
+    // getter plus additions/deletions/total.
+    function editionsTable(rows, labelHeader, labelOf) {
+      const body = rows.map((row, i) => el('tr', {}, [
+        el('td', {}, [
+          el('span', { class: 'swatch', style: `background:${PALETTE[i % PALETTE.length]}` }),
+          labelOf(row),
+        ]),
+        el('td', { class: 'num add' }, `+${row.additions}`),
+        el('td', { class: 'num del' }, `-${row.deletions}`),
+        el('td', { class: 'num' }, String(row.total)),
+      ]));
+      const head = el('tr', {}, [
+        el('th', {}, labelHeader),
+        el('th', { class: 'num' }, 'Additions'),
+        el('th', { class: 'num' }, 'Deletions'),
+        el('th', { class: 'num' }, 'Total'),
+      ]);
+      return scrollable(el('table', {}, [el('thead', {}, head), el('tbody', {}, body)]));
     }
 
     function panel(title, body) {
@@ -475,8 +478,16 @@
       const contribs = data.contributors || [];
       if (contribs.length) {
         app.appendChild(el('section', {}, el('div', { class: 'grid panels' }, [
-          panel('Contributors', contributorsTable(contribs)),
-          panel('Contribution share', donut(contribs)),
+          panel('Contributors', editionsTable(contribs, 'Contributor', c => c.author)),
+          panel('Contribution share', donutChart(contribs.map(c => ({ label: c.author, value: c.total })))),
+        ])));
+      }
+
+      const langs = data.languages || [];
+      if (langs.length) {
+        app.appendChild(el('section', {}, el('div', { class: 'grid panels' }, [
+          panel('Languages', editionsTable(langs, 'Language', l => l.name)),
+          panel('Language share', donutChart(langs.map(l => ({ label: l.name, value: l.total })))),
         ])));
       }
 
