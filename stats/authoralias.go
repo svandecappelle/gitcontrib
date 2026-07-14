@@ -8,13 +8,6 @@ import (
 // authorIDSep separates the name and email inside an AuthorsEditions map key.
 const authorIDSep = "\x1f"
 
-type authorIdentity struct {
-	name      string
-	email     string
-	additions int
-	deletions int
-}
-
 // splitAuthorKey parses an AuthorsEditions key back into its name and email.
 func splitAuthorKey(key string) (name, email string) {
 	if i := strings.Index(key, authorIDSep); i >= 0 {
@@ -26,88 +19,75 @@ func splitAuthorKey(key string) (name, email string) {
 // mergeAuthorAliases groups author identities that belong to the same person
 // and returns the merged contributors, sorted by total changes (descending).
 //
-// Two identities are considered the same person when they share a non-empty
-// email or a non-empty (case-insensitive) name. Grouping is transitive, so
-// "Jane <perso>", "Jane <work>" and "jane-doe <work>" all collapse into one.
-// The displayed name is taken from the identity with the most changes.
+// Identities are grouped by their (case-insensitive) author name; identities
+// without a name are grouped by email instead. Only the name is used as the
+// grouping key on purpose: merging by email as well would let a bot that
+// authors commits under a human's email (e.g. semantic-release, renovate)
+// bridge otherwise-unrelated people into one giant contributor. The displayed
+// name is taken from the identity with the most changes, and Identities lists
+// the exact tokens (name spellings, or emails for name-less identities) that
+// reproduce this group when used as a user filter.
 func mergeAuthorAliases(editions map[string][2]int) []Contributor {
-	ids := make([]authorIdentity, 0, len(editions))
+	// Group by a stable key: the lowercased name, or "email:<addr>" when the
+	// name is empty.
+	type group struct {
+		additions, deletions int
+		bestName             string
+		bestTotal            int
+		names                map[string]bool // distinct name spellings
+		emails               map[string]bool // emails (used only for name-less groups)
+	}
+	groups := map[string]*group{}
+
 	for key, e := range editions {
 		name, email := splitAuthorKey(key)
-		ids = append(ids, authorIdentity{name: name, email: email, additions: e[0], deletions: e[1]})
-	}
+		name = strings.TrimSpace(name)
+		email = strings.TrimSpace(email)
 
-	// Union-find over the identities.
-	parent := make([]int, len(ids))
-	for i := range parent {
-		parent[i] = i
-	}
-	var find func(int) int
-	find = func(x int) int {
-		for parent[x] != x {
-			parent[x] = parent[parent[x]]
-			x = parent[x]
+		groupKey := strings.ToLower(name)
+		if groupKey == "" {
+			groupKey = "email:" + strings.ToLower(email)
 		}
-		return x
-	}
-	union := func(a, b int) {
-		if ra, rb := find(a), find(b); ra != rb {
-			parent[ra] = rb
+		g := groups[groupKey]
+		if g == nil {
+			g = &group{names: map[string]bool{}, emails: map[string]bool{}}
+			groups[groupKey] = g
 		}
-	}
-
-	byEmail := map[string]int{}
-	byName := map[string]int{}
-	for i, id := range ids {
-		if email := strings.ToLower(strings.TrimSpace(id.email)); email != "" {
-			if j, ok := byEmail[email]; ok {
-				union(i, j)
-			} else {
-				byEmail[email] = i
+		g.additions += e[0]
+		g.deletions += e[1]
+		if name != "" {
+			g.names[name] = true
+		}
+		if email != "" {
+			g.emails[email] = true
+		}
+		if total := e[0] + e[1]; total >= g.bestTotal {
+			g.bestTotal = total
+			if name != "" {
+				g.bestName = name
+			} else if g.bestName == "" {
+				g.bestName = email
 			}
 		}
-		if name := strings.ToLower(strings.TrimSpace(id.name)); name != "" {
-			if j, ok := byName[name]; ok {
-				union(i, j)
-			} else {
-				byName[name] = i
-			}
-		}
-	}
-
-	groups := map[int][]int{}
-	for i := range ids {
-		root := find(i)
-		groups[root] = append(groups[root], i)
 	}
 
 	contributors := make([]Contributor, 0, len(groups))
-	for _, members := range groups {
-		additions, deletions, best := 0, 0, members[0]
-		var identities []string
-		seen := map[string]bool{}
-		for _, m := range members {
-			additions += ids[m].additions
-			deletions += ids[m].deletions
-			if ids[m].additions+ids[m].deletions > ids[best].additions+ids[best].deletions {
-				best = m
-			}
-			for _, v := range []string{ids[m].email, ids[m].name} {
-				if v = strings.TrimSpace(v); v != "" && !seen[v] {
-					seen[v] = true
-					identities = append(identities, v)
-				}
+	for _, g := range groups {
+		identities := make([]string, 0, len(g.names))
+		for n := range g.names {
+			identities = append(identities, n)
+		}
+		if len(identities) == 0 { // name-less group: filter by its emails
+			for em := range g.emails {
+				identities = append(identities, em)
 			}
 		}
-		name := ids[best].name
-		if name == "" {
-			name = ids[best].email
-		}
+		sort.Strings(identities)
 		contributors = append(contributors, Contributor{
-			Author:     name,
-			Additions:  additions,
-			Deletions:  deletions,
-			Total:      additions + deletions,
+			Author:     g.bestName,
+			Additions:  g.additions,
+			Deletions:  g.deletions,
+			Total:      g.additions + g.deletions,
 			Identities: identities,
 		})
 	}

@@ -102,8 +102,10 @@ contributors ranking with a
 contribution-share chart, a breakdown of changes by language / file type, and a
 breakdown of commits by Conventional Commits type (feat, fix, …). The raw data
 is available as JSON on `http://localhost:8080/api/stats`. Author identities
-that share a name or an email are merged, so one person committing under
-several name/email combinations is counted once. Clicking a contributor filters
+that share a name are merged, so one person committing under one name with
+several emails is counted once (merging by email as well is intentionally
+avoided, as bot/CI commits authored under a human's email would otherwise
+bridge unrelated people together). Clicking a contributor filters
 the whole view down to that person (across all their identities). An "Export
 JSON" button downloads the current statistics as a JSON file.
 
