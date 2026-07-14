@@ -97,7 +97,9 @@ Then open http://localhost:8080 in a browser. The page shows the commit
 calendar, commits by weekday and by hour, the contributors ranking with a
 contribution-share chart, a breakdown of changes by language / file type, and a
 breakdown of commits by Conventional Commits type (feat, fix, …). The raw data
-is available as JSON on `http://localhost:8080/api/stats`.
+is available as JSON on `http://localhost:8080/api/stats`. Author identities
+that share a name or an email are merged, so one person committing under
+several name/email combinations is counted once.
 
 The UI has a parameters form to re-run the analysis on the fly (number of
 weeks, delta, a specific user or all users, merge, include/exclude patterns).

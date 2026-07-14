@@ -324,11 +324,12 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 			if ignore {
 				continue
 			}
-			if r.AuthorsEditions[c.Author.Name] == nil {
-				r.AuthorsEditions[c.Author.Name] = make(map[string]int, 2)
+			authorKey := c.Author.Name + authorIDSep + c.Author.Email
+			if r.AuthorsEditions[authorKey] == nil {
+				r.AuthorsEditions[authorKey] = make(map[string]int, 2)
 			}
-			r.AuthorsEditions[c.Author.Name]["additions"] = r.AuthorsEditions[c.Author.Name]["additions"] + stat.Addition
-			r.AuthorsEditions[c.Author.Name]["deletions"] = r.AuthorsEditions[c.Author.Name]["deletions"] + stat.Deletion
+			r.AuthorsEditions[authorKey]["additions"] = r.AuthorsEditions[authorKey]["additions"] + stat.Addition
+			r.AuthorsEditions[authorKey]["deletions"] = r.AuthorsEditions[authorKey]["deletions"] + stat.Deletion
 
 			lang := languageForFile(stat.Name)
 			if r.LanguageEditions[lang] == nil {

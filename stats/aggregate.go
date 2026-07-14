@@ -136,17 +136,8 @@ func Aggregate(results []*StatsResult) AggregatedStats {
 		}
 	}
 
-	for author, e := range editions {
-		agg.Contributors = append(agg.Contributors, Contributor{
-			Author:    author,
-			Additions: e[0],
-			Deletions: e[1],
-			Total:     e[0] + e[1],
-		})
-	}
-	sort.Slice(agg.Contributors, func(i, j int) bool {
-		return agg.Contributors[i].Total > agg.Contributors[j].Total
-	})
+	// Collapse the per-identity editions into one entry per person.
+	agg.Contributors = mergeAuthorAliases(editions)
 
 	for lang, e := range langEditions {
 		agg.Languages = append(agg.Languages, Language{
