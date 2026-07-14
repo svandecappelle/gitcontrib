@@ -109,8 +109,10 @@
 
     .donut-wrap { display: flex; flex-direction: column; gap: 20px; align-items: center; justify-content: center; }
     .donut { width: 240px; height: 240px; flex: none; }
-    .donut-legend { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
-    .donut-legend div { display: flex; align-items: center; }
+    .donut-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px 20px; font-size: 13px; width: 100%; }
+    .donut-legend div { display: flex; align-items: center; min-width: 0; }
+    .donut-legend .swatch { flex: none; }
+    .donut-legend div span:not(.swatch) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .msg { color: var(--muted); padding: 40px; text-align: center; }
     a { color: var(--accent); }
@@ -274,9 +276,9 @@
         offset += frac * circ;
       });
       const legend = el('div', { class: 'donut-legend' },
-        contribs.map((c, i) => el('div', {}, [
+        contribs.map((c, i) => el('div', { title: `${c.author} (${c.total})` }, [
           el('span', { class: 'swatch', style: `background:${PALETTE[i % PALETTE.length]}` }),
-          `${c.author} (${c.total})`,
+          el('span', {}, `${c.author} (${c.total})`),
         ])));
       return el('div', { class: 'donut-wrap' }, [svg, legend]);
     }
