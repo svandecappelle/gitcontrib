@@ -98,6 +98,10 @@
     .bar-label { font-size: 10px; color: var(--muted); white-space: nowrap; }
     .bar-wrap:hover .bar { background: #58a6ff; }
 
+    /* Trend line chart */
+    .trend { width: 100%; height: auto; display: block; }
+    .trend .axis { fill: var(--muted); font-size: 10px; }
+
     /* Calendar heatmap */
     .cal { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; grid-auto-columns: minmax(13px, 1fr); gap: 3px; width: 100%; height: 148px; overflow-x: auto; padding-bottom: 6px; }
     .cell { border-radius: 2px; background: var(--hm0); }
@@ -328,6 +332,59 @@
       return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
     }
 
+    function svgNode(tag, attrs) {
+      const n = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+      return n;
+    }
+
+    // weeklyTrend buckets the daily calendar (which starts on a Monday) into
+    // weekly commit totals.
+    function weeklyTrend(days) {
+      const weeks = [];
+      for (let i = 0; i < days.length; i += 7) {
+        const chunk = days.slice(i, i + 7);
+        weeks.push({ date: chunk[0].date, value: chunk.reduce((s, d) => s + d.count, 0) });
+      }
+      return weeks;
+    }
+
+    // trendChart draws an area+line chart of commits over time.
+    function trendChart(points) {
+      const w = 900, h = 200, padL = 8, padR = 8, padT = 12, padB = 24;
+      const innerW = w - padL - padR, innerH = h - padT - padB;
+      const max = Math.max(1, ...points.map(p => p.value));
+      const n = points.length;
+      const x = i => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+      const y = v => padT + innerH - (v / max) * innerH;
+
+      const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+      const area = `${line} L${x(n - 1).toFixed(1)},${(padT + innerH).toFixed(1)} L${x(0).toFixed(1)},${(padT + innerH).toFixed(1)} Z`;
+
+      const svg = svgNode('svg', { class: 'trend', viewBox: `0 0 ${w} ${h}`, preserveAspectRatio: 'none' });
+      svg.appendChild(svgNode('path', { d: area, fill: 'var(--accent)', 'fill-opacity': '0.15', stroke: 'none' }));
+      svg.appendChild(svgNode('path', { d: line, fill: 'none', stroke: 'var(--accent)', 'stroke-width': '2', 'stroke-linejoin': 'round' }));
+
+      points.forEach((p, i) => {
+        const dot = svgNode('circle', { cx: x(i).toFixed(1), cy: y(p.value).toFixed(1), r: '2.5', fill: 'var(--accent)' });
+        dot.appendChild(svgNode('title', {})).textContent = `${fmtDate(p.date)}: ${p.value} commit${p.value === 1 ? '' : 's'}`;
+        svg.appendChild(dot);
+      });
+
+      // Max value (top-left) and first / last date labels (bottom).
+      const maxLabel = svgNode('text', { class: 'axis', x: padL, y: padT - 2 });
+      maxLabel.textContent = `max ${max}`;
+      svg.appendChild(maxLabel);
+      const first = svgNode('text', { class: 'axis', x: padL, y: h - 6, 'text-anchor': 'start' });
+      first.textContent = fmtDate(points[0].date);
+      svg.appendChild(first);
+      const last = svgNode('text', { class: 'axis', x: w - padR, y: h - 6, 'text-anchor': 'end' });
+      last.textContent = fmtDate(points[n - 1].date);
+      svg.appendChild(last);
+
+      return svg;
+    }
+
     function relativeTime(iso) {
       const secs = Math.round((Date.now() - new Date(iso).getTime()) / 1000);
       if (secs < 60) return 'just now';
@@ -484,6 +541,11 @@
       ]));
 
       app.appendChild(el('section', {}, panel('Commit activity', calendar(data.calendar || []))));
+
+      const trend = weeklyTrend(data.calendar || []);
+      if (trend.length > 1) {
+        app.appendChild(el('section', {}, panel('Commits over time (weekly)', trendChart(trend))));
+      }
 
       const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
       const hourLabels = Array.from({ length: 24 }, (_, i) => String(i));
