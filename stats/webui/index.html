@@ -325,8 +325,9 @@
       if (data.refreshing) cls += ' refreshing';
       else if (data.stale) cls += ' stale';
       const state = data.refreshing ? 'refreshing' : (data.stale ? 'stale' : 'up to date');
+      const when = new Date(data.updatedAt).toLocaleString();
       document.getElementById('cache-info').innerHTML =
-        `<span class="${cls}"></span>updated ${relativeTime(data.updatedAt)} · ${state}`;
+        `<span class="${cls}"></span>updated ${when} (${relativeTime(data.updatedAt)}) · ${state}`;
     }
 
     let pollTimer = null;
