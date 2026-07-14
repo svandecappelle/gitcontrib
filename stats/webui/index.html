@@ -107,8 +107,9 @@
     .del { color: var(--del); }
     .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 8px; vertical-align: middle; }
 
-    .donut-wrap { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
-    .donut-legend { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+    .donut-wrap { display: flex; gap: 32px; align-items: center; justify-content: center; flex-wrap: wrap; }
+    .donut { width: 240px; height: 240px; flex: none; }
+    .donut-legend { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
     .donut-legend div { display: flex; align-items: center; }
 
     .msg { color: var(--muted); padding: 40px; text-align: center; }
@@ -253,8 +254,7 @@
       const size = 160, r = 60, cx = size / 2, cy = size / 2;
       const circ = 2 * Math.PI * r;
       const svg = document.createElementNS(NS, 'svg');
-      svg.setAttribute('width', size);
-      svg.setAttribute('height', size);
+      svg.setAttribute('class', 'donut');
       svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
       let offset = 0;
       contribs.forEach((c, i) => {
