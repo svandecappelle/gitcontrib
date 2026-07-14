@@ -101,6 +101,8 @@
     /* Trend line chart */
     .trend { width: 100%; height: auto; display: block; }
     .trend .axis { fill: var(--muted); font-size: 10px; }
+    .trend .band-even { fill: rgba(255, 255, 255, 0.06); }
+    .trend .band-odd { fill: rgba(255, 255, 255, 0.015); }
 
     /* Calendar heatmap */
     .cal { display: grid; grid-template-rows: repeat(7, 1fr); grid-auto-flow: column; grid-auto-columns: minmax(13px, 1fr); gap: 3px; width: 100%; height: 148px; overflow-x: auto; padding-bottom: 6px; }
@@ -349,38 +351,62 @@
       return weeks;
     }
 
-    // trendChart draws an area+line chart of commits over time.
+    function shortDate(iso) {
+      return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    }
+
+    // trendChart draws an area+line chart of commits over time, one column per
+    // week with alternating (even/odd) background bands and dated x-axis ticks.
     function trendChart(points) {
-      const w = 900, h = 200, padL = 8, padR = 8, padT = 12, padB = 24;
+      const w = 900, h = 220, padL = 8, padR = 8, padT = 14, padB = 30;
       const innerW = w - padL - padR, innerH = h - padT - padB;
       const max = Math.max(1, ...points.map(p => p.value));
       const n = points.length;
-      const x = i => padL + (n <= 1 ? innerW / 2 : (i / (n - 1)) * innerW);
+      const step = innerW / n;
+      const xc = i => padL + (i + 0.5) * step;      // week column center
       const y = v => padT + innerH - (v / max) * innerH;
-
-      const line = points.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
-      const area = `${line} L${x(n - 1).toFixed(1)},${(padT + innerH).toFixed(1)} L${x(0).toFixed(1)},${(padT + innerH).toFixed(1)} Z`;
+      const baseline = padT + innerH;
 
       const svg = svgNode('svg', { class: 'trend', viewBox: `0 0 ${w} ${h}`, preserveAspectRatio: 'none' });
+
+      // Alternating weekly bands (also carry the hover tooltip).
+      points.forEach((p, i) => {
+        const band = svgNode('rect', {
+          x: (padL + i * step).toFixed(2), y: padT, width: step.toFixed(2), height: innerH,
+          class: i % 2 === 0 ? 'band-even' : 'band-odd',
+        });
+        band.appendChild(svgNode('title', {})).textContent =
+          `${fmtDate(p.date)}: ${p.value} commit${p.value === 1 ? '' : 's'}`;
+        svg.appendChild(band);
+      });
+
+      // Area + line.
+      const line = points.map((p, i) => `${i ? 'L' : 'M'}${xc(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(' ');
+      const area = `${line} L${xc(n - 1).toFixed(1)},${baseline.toFixed(1)} L${xc(0).toFixed(1)},${baseline.toFixed(1)} Z`;
       svg.appendChild(svgNode('path', { d: area, fill: 'var(--accent)', 'fill-opacity': '0.15', stroke: 'none' }));
       svg.appendChild(svgNode('path', { d: line, fill: 'none', stroke: 'var(--accent)', 'stroke-width': '2', 'stroke-linejoin': 'round' }));
 
+      // Data points.
       points.forEach((p, i) => {
-        const dot = svgNode('circle', { cx: x(i).toFixed(1), cy: y(p.value).toFixed(1), r: '2.5', fill: 'var(--accent)' });
-        dot.appendChild(svgNode('title', {})).textContent = `${fmtDate(p.date)}: ${p.value} commit${p.value === 1 ? '' : 's'}`;
+        const dot = svgNode('circle', { cx: xc(i).toFixed(1), cy: y(p.value).toFixed(1), r: '2.5', fill: 'var(--accent)' });
+        dot.appendChild(svgNode('title', {})).textContent =
+          `${fmtDate(p.date)}: ${p.value} commit${p.value === 1 ? '' : 's'}`;
         svg.appendChild(dot);
       });
 
-      // Max value (top-left) and first / last date labels (bottom).
-      const maxLabel = svgNode('text', { class: 'axis', x: padL, y: padT - 2 });
+      // Max label (top-left).
+      const maxLabel = svgNode('text', { class: 'axis', x: padL, y: padT - 3 });
       maxLabel.textContent = `max ${max}`;
       svg.appendChild(maxLabel);
-      const first = svgNode('text', { class: 'axis', x: padL, y: h - 6, 'text-anchor': 'start' });
-      first.textContent = fmtDate(points[0].date);
-      svg.appendChild(first);
-      const last = svgNode('text', { class: 'axis', x: w - padR, y: h - 6, 'text-anchor': 'end' });
-      last.textContent = fmtDate(points[n - 1].date);
-      svg.appendChild(last);
+
+      // Dated x-axis ticks at regular intervals (about ten labels), plus the last.
+      const every = Math.max(1, Math.ceil(n / 10));
+      for (let i = 0; i < n; i++) {
+        if (i % every !== 0 && i !== n - 1) continue;
+        const t = svgNode('text', { class: 'axis', x: xc(i).toFixed(1), y: h - 9, 'text-anchor': 'middle' });
+        t.textContent = shortDate(points[i].date);
+        svg.appendChild(t);
+      }
 
       return svg;
     }
