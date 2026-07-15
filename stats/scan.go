@@ -67,7 +67,7 @@ func openFile(filePath string) *os.File {
 // of each line and parses it to a slice of strings.
 func parseFileLinesToSlice(configFilePath string) []string {
 	f := openFile(configFilePath)
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var lines []string
 	scanner := bufio.NewScanner(f)
@@ -175,7 +175,7 @@ func ScanGitFolders(folders []string, folder string) ([]string, error) {
 	}
 	pathFrom = filepath.Join(pathFrom, folder)
 	files, err := f.Readdir(-1)
-	f.Close()
+	_ = f.Close()
 	if err != nil {
 		log.Fatal(err)
 		return folders, err

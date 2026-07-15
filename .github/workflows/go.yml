@@ -10,47 +10,34 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.20.x]
         os: [macos-latest, ubuntu-latest]
 
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Setup go
-        uses: actions/setup-go@v2
-        with:
-          go-version: ${{ matrix.go-version }}
-
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
+      - name: Setup go
+        uses: actions/setup-go@v5
         with:
-          skip-go-installation: true
+          go-version-file: go.mod
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: latest
 
       - name: Testing
-        continue-on-error: ${{ matrix.go-version == 'tip' }}
         run: |
           go version
-          ls -hal
-          pwd
-          cover_flags="-covermode=atomic -coverprofile=coverage.out"
-          GO_TEST_FLAGS="$cover_flags.out"
-          GO_TEST_SAFE_FLAGS="$cover_flags-safe.out"
-          GO_TEST_RACE_FLAGS="$cover_flags-race.out"
-          GO_TEST_RACE_SAFE_FLAGS="$cover_flags-race-safe.out"
-
-          export GORACE="halt_on_error=1"
-          echo "CLASSIC ==========================================="
-          go test                  $GO_TEST_FLAGS           ./...
-          echo "SAFE =============================================="
-          go test       -tags safe $GO_TEST_SAFE_FLAGS      ./...
+          go test -covermode=atomic -coverprofile=coverage.out ./...
+          go test -tags safe -covermode=atomic -coverprofile=coverage-safe.out ./...
 
       - name: Reporting
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true

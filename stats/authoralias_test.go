@@ -111,7 +111,7 @@ func TestMergeAuthorAliasesSortedByTotal(t *testing.T) {
 	if len(got) != 3 {
 		t.Fatalf("want 3, got %d", len(got))
 	}
-	if !(got[0].Total >= got[1].Total && got[1].Total >= got[2].Total) {
+	if got[0].Total < got[1].Total || got[1].Total < got[2].Total {
 		t.Errorf("contributors not sorted by total desc: %+v", got)
 	}
 	if got[0].Author != "Big" {
