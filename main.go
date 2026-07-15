@@ -215,6 +215,9 @@ func buildLaunchOptions(c *cli.Context, cfg *stats.Config, console bool) (stats.
 		folders = found
 	}
 
+	// Expand any non-repository folder into its direct repository subfolders.
+	folders = stats.ExpandFolders(folders)
+
 	weeks := c.Int("weeks")
 	if !c.IsSet("weeks") && cfg.Weeks != nil {
 		weeks = *cfg.Weeks

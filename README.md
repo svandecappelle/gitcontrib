@@ -55,6 +55,10 @@ Positional arguments are interpreted as folders when they exist on disk,
 otherwise as a user (name or `email`, comma-separated for several). With no
 folder argument, the current repository (or the saved list) is scanned.
 
+When a given folder is not itself a git repository, its immediate
+subdirectories (one level deep) that are repositories are scanned instead — so
+you can point at a parent directory holding several repositories.
+
 ### Common flags (`stat`, `dashboard`, `web`)
 
 - `--weeks <n>` — number of weeks to analyze (console default fits the terminal width).
