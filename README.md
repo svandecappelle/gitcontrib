@@ -61,6 +61,7 @@ folder argument, the current repository (or the saved list) is scanned.
 - `--delta <n>[y|m|w|d]` — shift the analyzed window into the past, e.g. `1y`, `6m`, `2w`.
 - `--count-all` — analyze every user instead of just the git-config user.
 - `--merge` — merge all scanned folders into a single result.
+- `--config <path>` — JSON config file with default values (see [Configuration file](#configuration-file)).
 
 `dashboard` and `web` additionally accept `--file-include-pattern` and
 `--file-exclude-pattern` (regular expressions, repeatable) to restrict which
@@ -83,6 +84,36 @@ Save repositories to scan when you are not inside a repository folder:
 ```sh
 gitcontribution add-repository /path/to/repo
 gitcontribution list-repositories
+```
+
+## Configuration file
+
+Default analysis values can be stored in a JSON config file, read from
+`<home>/.gitcontrib.json` by default (override with `--config <path>`). A
+command-line flag always wins over the config, which wins over the built-in
+default. Every field is optional:
+
+```json
+{
+  "weeks": 12,
+  "delta": "6m",
+  "user": "me@example.com",
+  "countAll": false,
+  "merge": false,
+  "folders": ["/path/to/repoA", "/path/to/repoB"],
+  "includePatterns": ["\\.go$"],
+  "excludePatterns": ["vendor/", "_test\\.go$"],
+  "web": {
+    "addr": ":9000",
+    "ttl": "10m",
+    "cacheFile": "/tmp/gitcontrib-cache.json"
+  }
+}
+```
+
+```sh
+gitcontribution web --config ./gitcontrib.json
+gitcontribution stat --weeks 4   # --weeks overrides the config's "weeks"
 ```
 
 ## Web interface

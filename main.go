@@ -55,6 +55,11 @@ func statFlags() []cli.Flag {
 			Value: false,
 			Usage: "Force count all users contributions",
 		},
+		&cli.StringFlag{
+			Name:  "config",
+			Value: "",
+			Usage: "Path to the JSON config file with default values (default: <home>/.gitcontrib.json)",
+		},
 	}
 }
 
@@ -153,11 +158,21 @@ func patternFlags() []cli.Flag {
 	}
 }
 
+// strFlag returns the flag value when the user set it, otherwise the config
+// value when present, otherwise the flag's current (default) value.
+func strFlag(c *cli.Context, name string, cfg *string) string {
+	if !c.IsSet(name) && cfg != nil {
+		return *cfg
+	}
+	return c.String(name)
+}
+
 // buildLaunchOptions resolves the folders, user and scan duration shared by the
-// stat, dashboard and web commands. When console is true the scan window is
-// derived from (and validated against) the terminal width; otherwise it
-// defaults to one year, or the --weeks flag when provided.
-func buildLaunchOptions(c *cli.Context, console bool) (stats.LaunchOptions, error) {
+// stat, dashboard and web commands, applying precedence: command-line flag,
+// then the config file, then the built-in default. When console is true the
+// scan window is derived from (and validated against) the terminal width;
+// otherwise it defaults to one year, or the resolved weeks value when set.
+func buildLaunchOptions(c *cli.Context, cfg *stats.Config, console bool) (stats.LaunchOptions, error) {
 	var folders []string
 	var user *string
 
@@ -171,14 +186,27 @@ func buildLaunchOptions(c *cli.Context, console bool) (stats.LaunchOptions, erro
 		}
 	}
 
-	if user == nil && !c.Bool("count-all") {
-		_, gitEmail, err := getUserFromGitConfig()
-		if err != nil {
-			return stats.LaunchOptions{}, err
-		}
-		user = gitEmail
+	countAll := c.Bool("count-all")
+	if !c.IsSet("count-all") && cfg.CountAll != nil {
+		countAll = *cfg.CountAll
 	}
 
+	if user == nil && !countAll {
+		if cfg.User != nil && *cfg.User != "" {
+			u := *cfg.User
+			user = &u
+		} else {
+			_, gitEmail, err := getUserFromGitConfig()
+			if err != nil {
+				return stats.LaunchOptions{}, err
+			}
+			user = gitEmail
+		}
+	}
+
+	if len(folders) == 0 && len(cfg.Folders) > 0 {
+		folders = cfg.Folders
+	}
 	if len(folders) == 0 {
 		found, err := stats.GetFolders()
 		if err != nil {
@@ -187,9 +215,13 @@ func buildLaunchOptions(c *cli.Context, console bool) (stats.LaunchOptions, erro
 		folders = found
 	}
 
+	weeks := c.Int("weeks")
+	if !c.IsSet("weeks") && cfg.Weeks != nil {
+		weeks = *cfg.Weeks
+	}
 	width, _, _ := term.GetSize(0)
 	durationInWeeks := 52
-	if weeks := c.Int("weeks"); weeks > 0 {
+	if weeks > 0 {
 		if console && width < (4*weeks)+16 {
 			return stats.LaunchOptions{}, errors.New("too much data to display in this terminal width")
 		}
@@ -198,28 +230,50 @@ func buildLaunchOptions(c *cli.Context, console bool) (stats.LaunchOptions, erro
 		durationInWeeks = (width - 16) / 4
 	}
 
+	merge := c.Bool("merge")
+	if !c.IsSet("merge") && cfg.Merge != nil {
+		merge = *cfg.Merge
+	}
+
+	include := c.StringSlice("file-include-pattern")
+	if !c.IsSet("file-include-pattern") && len(cfg.IncludePatterns) > 0 {
+		include = cfg.IncludePatterns
+	}
+	exclude := c.StringSlice("file-exclude-pattern")
+	if !c.IsSet("file-exclude-pattern") && len(cfg.ExcludePatterns) > 0 {
+		exclude = cfg.ExcludePatterns
+	}
+
 	return stats.LaunchOptions{
 		User:             user,
 		DurationInWeeks:  durationInWeeks,
 		Folders:          folders,
-		Delta:            c.String("delta"),
-		PatternToExclude: c.StringSlice("file-exclude-pattern"),
-		PatternToInclude: c.StringSlice("file-include-pattern"),
+		Merge:            merge,
+		Delta:            strFlag(c, "delta", cfg.Delta),
+		PatternToExclude: exclude,
+		PatternToInclude: include,
 	}, nil
 }
 
 func runStat(c *cli.Context) error {
-	opts, err := buildLaunchOptions(c, true)
+	cfg, err := stats.LoadConfig(c.String("config"))
 	if err != nil {
 		return err
 	}
-	opts.Merge = c.Bool("merge")
+	opts, err := buildLaunchOptions(c, cfg, true)
+	if err != nil {
+		return err
+	}
 	stats.Launch(opts)
 	return nil
 }
 
 func runDashboard(c *cli.Context) error {
-	opts, err := buildLaunchOptions(c, false)
+	cfg, err := stats.LoadConfig(c.String("config"))
+	if err != nil {
+		return err
+	}
+	opts, err := buildLaunchOptions(c, cfg, false)
 	if err != nil {
 		return err
 	}
@@ -229,23 +283,26 @@ func runDashboard(c *cli.Context) error {
 }
 
 func runWeb(c *cli.Context) error {
-	opts, err := buildLaunchOptions(c, false)
+	cfg, err := stats.LoadConfig(c.String("config"))
 	if err != nil {
 		return err
 	}
-	opts.Merge = c.Bool("merge")
+	opts, err := buildLaunchOptions(c, cfg, false)
+	if err != nil {
+		return err
+	}
 
-	ttl, err := time.ParseDuration(c.String("ttl"))
+	ttl, err := time.ParseDuration(strFlag(c, "ttl", cfg.Web.TTL))
 	if err != nil {
 		return fmt.Errorf("invalid --ttl value: %w", err)
 	}
 
-	cacheFile := c.String("cache-file")
+	cacheFile := strFlag(c, "cache-file", cfg.Web.CacheFile)
 	if cacheFile == "" {
 		cacheFile = defaultCacheFile()
 	}
 
-	return stats.Serve(opts, c.String("addr"), ttl, cacheFile)
+	return stats.Serve(opts, strFlag(c, "addr", cfg.Web.Addr), ttl, cacheFile)
 }
 
 // defaultCacheFile returns the default web cache path, in the user's home
