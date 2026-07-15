@@ -52,8 +52,11 @@ gitcontribution web             # web UI + API on http://localhost:8080
 | `list-repositories` | `lr` | List the saved repositories. |
 
 Positional arguments are interpreted as folders when they exist on disk,
-otherwise as a user (name or `email`, comma-separated for several). With no
-folder argument, the current repository (or the saved list) is scanned.
+otherwise as a user (name or `email`, comma-separated for several).
+
+With no folder argument, the scanned folders are resolved in this order: the
+**current directory when it is a git repository** (the config `folders` are then
+ignored), otherwise the config `folders`, otherwise the saved repository list.
 
 When a given folder is not itself a git repository, its immediate
 subdirectories (one level deep) that are repositories are scanned instead — so
@@ -122,7 +125,9 @@ gitcontribution stat --weeks 4   # --weeks overrides the config's "weeks"
 
 Path fields (`folders`, `web.cacheFile`) expand environment variables and a
 leading `~`, e.g. `"$HOME/wd"` or `"~/wd"`. A folder that is not a repository is
-expanded to its direct repository subfolders (see above).
+expanded to its direct repository subfolders (see above). The config `folders`
+are ignored when the command runs inside a git repository (the current
+repository is analyzed instead).
 
 ## Web interface
 

@@ -204,15 +204,20 @@ func buildLaunchOptions(c *cli.Context, cfg *stats.Config, console bool) (stats.
 		}
 	}
 
-	if len(folders) == 0 && len(cfg.Folders) > 0 {
-		folders = cfg.Folders
-	}
 	if len(folders) == 0 {
-		found, err := stats.GetFolders()
-		if err != nil {
-			return stats.LaunchOptions{}, err
+		switch {
+		case stats.IsRepo("."):
+			// Inside a git repository: analyze it and ignore the config folders.
+			folders = []string{"."}
+		case len(cfg.Folders) > 0:
+			folders = cfg.Folders
+		default:
+			found, err := stats.GetFolders()
+			if err != nil {
+				return stats.LaunchOptions{}, err
+			}
+			folders = found
 		}
-		folders = found
 	}
 
 	// Expand any non-repository folder into its direct repository subfolders.

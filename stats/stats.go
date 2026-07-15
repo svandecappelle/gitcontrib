@@ -58,6 +58,11 @@ type StatsOptions struct {
 	PatternToInclude     []string
 }
 
+// IsRepo reports whether path is (the root of) a git repository.
+func IsRepo(path string) bool {
+	return isRepo(path)
+}
+
 func isRepo(path string) bool {
 	_, err := git.PlainOpen(path)
 	return err == nil
