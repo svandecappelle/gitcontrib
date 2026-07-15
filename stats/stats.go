@@ -276,6 +276,9 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 		return err
 	}
 
+	// Resolve author identities through the repository's .mailmap (if any).
+	mailmap := loadMailmap(path)
+
 	// iterate the commits
 	offset := calcOffset(r.EndOfScan)
 	err = iterator.ForEach(func(c *object.Commit) error {
@@ -286,14 +289,16 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 			return nil
 		}
 
+		authorName, authorEmail := mailmap.Resolve(c.Author.Name, c.Author.Email)
+
 		if emailOrUsername != nil {
 			users := strings.Split(*emailOrUsername, ",")
 			var found bool
 			for _, u := range users {
-				if strings.Contains(u, "@") && c.Author.Email == u {
+				if strings.Contains(u, "@") && authorEmail == u {
 					found = true
 					break
-				} else if c.Author.Name == u {
+				} else if authorName == u {
 					found = true
 					break
 				}
@@ -326,7 +331,7 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 			if ignore {
 				continue
 			}
-			authorKey := c.Author.Name + authorIDSep + c.Author.Email
+			authorKey := authorName + authorIDSep + authorEmail
 			if r.AuthorsEditions[authorKey] == nil {
 				r.AuthorsEditions[authorKey] = make(map[string]int, 2)
 			}
