@@ -120,6 +120,10 @@ gitcontribution web --config ./gitcontrib.json
 gitcontribution stat --weeks 4   # --weeks overrides the config's "weeks"
 ```
 
+Path fields (`folders`, `web.cacheFile`) expand environment variables and a
+leading `~`, e.g. `"$HOME/wd"` or `"~/wd"`. A folder that is not a repository is
+expanded to its direct repository subfolders (see above).
+
 ## Web interface
 
 ```sh

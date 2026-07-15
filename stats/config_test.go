@@ -62,6 +62,29 @@ func TestLoadConfigInvalid(t *testing.T) {
 	}
 }
 
+func TestLoadConfigExpandsPaths(t *testing.T) {
+	t.Setenv("GC_TEST_DIR", "/tmp/gc-test")
+	path := filepath.Join(t.TempDir(), "c.json")
+	content := `{"folders":["$GC_TEST_DIR/sub","~/x"],"web":{"cacheFile":"$GC_TEST_DIR/cache.json"}}`
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Folders[0] != "/tmp/gc-test/sub" {
+		t.Errorf("Folders[0] = %q, want /tmp/gc-test/sub", cfg.Folders[0])
+	}
+	home, _ := os.UserHomeDir()
+	if want := filepath.Join(home, "x"); cfg.Folders[1] != want {
+		t.Errorf("Folders[1] = %q, want %q", cfg.Folders[1], want)
+	}
+	if cfg.Web.CacheFile == nil || *cfg.Web.CacheFile != "/tmp/gc-test/cache.json" {
+		t.Errorf("Web.CacheFile = %v, want /tmp/gc-test/cache.json", cfg.Web.CacheFile)
+	}
+}
+
 func TestDefaultConfigPath(t *testing.T) {
 	if DefaultConfigPath() == "" {
 		t.Error("DefaultConfigPath should never be empty")

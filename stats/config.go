@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // WebConfig holds the web-server default values.
@@ -58,5 +59,33 @@ func LoadConfig(path string) (*Config, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, err
 	}
+
+	// Expand environment variables and "~" in path-like fields, since JSON does
+	// not do it (e.g. "folders": ["$HOME/wd"]).
+	for i := range cfg.Folders {
+		cfg.Folders[i] = expandPath(cfg.Folders[i])
+	}
+	if cfg.Web.CacheFile != nil {
+		expanded := expandPath(*cfg.Web.CacheFile)
+		cfg.Web.CacheFile = &expanded
+	}
 	return &cfg, nil
+}
+
+// expandPath expands environment variables ($VAR, ${VAR}) and a leading "~" in
+// a filesystem path.
+func expandPath(p string) string {
+	if p == "" {
+		return p
+	}
+	p = os.ExpandEnv(p)
+	if p == "~" || strings.HasPrefix(p, "~/") {
+		if home, err := os.UserHomeDir(); err == nil {
+			if p == "~" {
+				return home
+			}
+			return filepath.Join(home, p[2:])
+		}
+	}
+	return p
 }
