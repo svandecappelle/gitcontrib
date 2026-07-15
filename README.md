@@ -102,12 +102,11 @@ contributors ranking with a
 contribution-share chart, a breakdown of changes by language / file type, and a
 breakdown of commits by Conventional Commits type (feat, fix, …). The raw data
 is available as JSON on `http://localhost:8080/api/stats`. Author identities
-that share a name are merged, so one person committing under one name with
-several emails is counted once (merging by email as well is intentionally
-avoided, as bot/CI commits authored under a human's email would otherwise
-bridge unrelated people together). For precise, explicit control, a repository
-`.mailmap` file is honored (all standard forms), so different name/email
-spellings can be mapped to a single canonical identity. Clicking a contributor filters
+are grouped by email (like `git shortlog`), so one person committing under a
+stable email with several name spellings is counted once, and the displayed
+name is the spelling with the most changes. To unify a person's several emails
+(or map bot/old identities), add a repository `.mailmap` file — all standard
+forms are honored. Clicking a contributor filters
 the whole view down to that person (across all their identities). An "Export
 JSON" button downloads the current statistics as a JSON file.
 
