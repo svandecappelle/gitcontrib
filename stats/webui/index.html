@@ -21,6 +21,8 @@
       --hm4: #39d353;
     }
     * { box-sizing: border-box; }
+    /* A flex/grid display rule would otherwise win over the hidden attribute. */
+    [hidden] { display: none !important; }
     body {
       margin: 0;
       background: var(--bg);
@@ -140,7 +142,97 @@
     .donut-legend .swatch { flex: none; }
     .donut-legend div span:not(.swatch) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
+    /* Settings dialog */
+    .modal { position: fixed; inset: 0; z-index: 50; background: rgba(1, 4, 9, .72); display: flex; align-items: flex-start; justify-content: center; padding: 40px 16px; overflow-y: auto; }
+    .modal-card { display: flex; flex-direction: column; width: 760px; max-width: 100%; max-height: calc(100vh - 80px); background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, .6); }
+    .modal-head { display: flex; align-items: baseline; gap: 12px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+    .modal-head h2 { margin: 0; font-size: 16px; }
+    .modal-head .sub { margin-left: auto; max-width: 60%; overflow: hidden; white-space: nowrap; }
+    .modal-body { display: flex; flex-direction: column; gap: 22px; padding: 18px 20px; overflow-y: auto; }
+    .modal-foot { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-top: 1px solid var(--border); }
+    button.icon { background: none; border: 0; color: var(--muted); font-size: 20px; line-height: 1; padding: 0 4px; cursor: pointer; }
+    button.icon:hover:not(:disabled) { background: none; color: var(--text); }
+    .sgroup h3 { margin: 0 0 10px; font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .sgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px 16px; }
+    .sfield { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+    .sfield > label { font-size: 12px; color: var(--muted); }
+    .sfield input[type=text], .sfield input[type=number], .sfield input[type=password] { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; font-size: 13px; }
+    .sfield input:disabled { opacity: .5; }
+    .sfield .hint { font-size: 11px; color: var(--muted); }
+    .sfield.check { flex-direction: row; align-items: center; gap: 8px; }
+    .sfield.check > label { color: var(--text); font-size: 13px; }
+    .srow { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13px; border-bottom: 1px dashed rgba(255, 255, 255, .06); }
+    .srow .path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .srow .ro { color: var(--muted); }
+    .srow input[type=text], .srow input[type=password] { width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 9px; font-size: 13px; }
+    .sgroup .hint { display: block; margin-top: 8px; font-size: 11px; color: var(--muted); }
+    .notice { border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 10px 12px; font-size: 12px; color: var(--muted); background: var(--bg); }
+    .notice.warn { border-left-color: var(--del); }
+    .notice code, .notice b { color: var(--text); }
+    .settings-msg { flex: 1; font-size: 12px; color: var(--muted); }
+    .settings-msg.error { color: var(--del); }
+    .settings-msg.ok { color: var(--add); }
+
+    /* Repository picker */
+    .picker { position: relative; }
+    .picker-btn { background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 7px 26px 7px 9px; font-size: 13px; font-weight: 400; text-align: left; min-width: 200px; max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .picker-btn::after { content: '▾'; position: absolute; right: 9px; color: var(--muted); }
+    .picker-btn:hover:not(:disabled), .picker-btn[aria-expanded=true] { background: var(--panel); border-color: var(--accent); }
+    .picker-panel { position: absolute; z-index: 20; top: calc(100% + 6px); left: 0; width: 420px; max-width: 90vw; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 8px 28px rgba(0, 0, 0, .55); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+    .picker-row { display: flex; align-items: center; gap: 8px; }
+    .picker-row input[type=text] { flex: 1; min-width: 0; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 6px 9px; font-size: 13px; }
+    .picker-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+    .picker-section { border-top: 1px solid var(--border); padding-top: 10px; }
+    .picker-list { max-height: 260px; overflow-y: auto; border-top: 1px solid var(--border); padding-top: 8px; display: flex; flex-direction: column; }
+    .field .picker-item { display: flex; align-items: center; gap: 8px; padding: 5px 4px; border-radius: 4px; cursor: pointer; font-size: 13px; color: var(--text); text-transform: none; letter-spacing: 0; }
+    .picker-item:hover { background: rgba(255, 255, 255, .05); }
+    .picker-item input { cursor: pointer; }
+    .picker-item .name { flex: none; }
+    .picker-item .path { color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .picker-empty { color: var(--muted); font-size: 12px; padding: 8px 4px; }
+    .picker-foot { display: flex; align-items: center; gap: 10px; border-top: 1px solid var(--border); padding-top: 10px; }
+    .picker-count { color: var(--muted); font-size: 12px; margin-right: auto; }
+    .picker-error { color: var(--del); font-size: 12px; }
+    button.link { background: none; border: 0; color: var(--accent); padding: 2px 4px; font-size: 12px; font-weight: 500; }
+    button.link:hover:not(:disabled) { background: none; text-decoration: underline; }
+    .chip.group { cursor: pointer; padding-right: 4px; }
+    .chip.group:hover { border-color: var(--accent); color: var(--text); }
+    .chip.group.on { border-color: var(--accent); color: var(--text); }
+    .chip.group .del { border: 0; background: none; color: var(--muted); padding: 0 4px; font-size: 13px; line-height: 1; cursor: pointer; }
+    .chip.group .del:hover { background: none; color: var(--del); }
+
+    /* Identity cards */
+    .idgrid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
+    .idcard { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
+    .idcard.all { border-color: var(--accent); }
+    .idhead { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .idname { margin: 0; font-size: 16px; font-weight: 600; }
+    .idname button { background: none; border: 0; padding: 0; font: inherit; color: var(--text); cursor: pointer; }
+    .idname button { text-decoration: underline dotted; text-underline-offset: 3px; }
+    .idname button:hover { background: none; color: var(--accent); }
+    .chip.branch { max-width: 220px; }
+    .idmeta { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+    .idmeta + .idmeta { margin-top: 2px; }
+    .idchips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px; font-size: 11px; color: var(--muted); background: var(--bg); white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+    .chip b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .idcols { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+    .idgroup h4 { margin: 0 0 6px; font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+    .idrow { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; font-size: 13px; border-bottom: 1px dashed rgba(255, 255, 255, 0.06); }
+    .idrow:last-child { border-bottom: 0; }
+    .idrow .k { color: var(--muted); flex: none; }
+    .idrow .v { font-variant-numeric: tabular-nums; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .langbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: var(--bg); }
+    .idlegend { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .idlegend span.item { display: inline-flex; align-items: center; }
+    .iderr { color: var(--del); font-size: 12px; }
+
     .msg { color: var(--muted); padding: 40px; text-align: center; }
+    .empty { text-align: center; padding: 36px 16px 8px; color: var(--muted); }
+    .empty h2 { margin: 0 0 10px; font-size: 18px; color: var(--text); }
+    .empty p { margin: 0 auto 6px; max-width: 680px; font-size: 13px; }
+    .empty .filters { color: var(--text); }
+    .empty .actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
     a { color: var(--accent); }
   </style>
 </head>
@@ -153,6 +245,7 @@
     <div class="controls">
       <span id="loader" class="spinner" style="display:none"></span>
       <span class="sub" id="cache-info"></span>
+      <button id="settings-btn" type="button">Settings</button>
       <button id="export-btn" type="button">Export JSON</button>
       <button id="refresh-btn" type="button">Refresh</button>
     </div>
@@ -161,8 +254,33 @@
   <section id="params-panel">
     <form id="params-form">
       <div class="field" id="repo-field" style="display:none">
-        <label for="f-repo">Repository</label>
-        <select id="f-repo"><option value="">All repositories</option></select>
+        <label>Repositories</label>
+        <div class="picker">
+          <button type="button" id="repo-btn" class="picker-btn" aria-haspopup="true" aria-expanded="false">All repositories</button>
+          <div class="picker-panel" id="repo-panel" hidden>
+            <div class="picker-row">
+              <input type="text" id="repo-search" placeholder="Filter repositories…" />
+              <button type="button" class="link" id="repo-all">All</button>
+              <button type="button" class="link" id="repo-none">None</button>
+            </div>
+            <div class="picker-section" id="repo-groups-section">
+              <div class="picker-label">Groups</div>
+              <div class="idchips" id="repo-groups"></div>
+            </div>
+            <div class="picker-list" id="repo-list"></div>
+            <div class="picker-error" id="repo-error" hidden></div>
+            <div class="picker-row" id="group-save-row" hidden>
+              <input type="text" id="group-name" placeholder="Group name" />
+              <button type="button" id="group-save">Save</button>
+              <button type="button" class="link" id="group-cancel">Cancel</button>
+            </div>
+            <div class="picker-foot">
+              <span class="picker-count" id="repo-count"></span>
+              <button type="button" class="link" id="group-save-toggle">Save as group…</button>
+              <button type="button" id="repo-apply">Apply</button>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="field">
         <label for="f-weeks">Weeks</label>
@@ -195,6 +313,22 @@
   <main id="app">
     <p class="msg"><span class="spinner"></span>Analyzing commits…</p>
   </main>
+
+  <div class="modal" id="settings" hidden>
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-head">
+        <h2 id="settings-title">Settings</h2>
+        <span class="sub" id="settings-file"></span>
+        <button type="button" class="icon" id="settings-close" title="Close">×</button>
+      </div>
+      <div class="modal-body" id="settings-body"></div>
+      <div class="modal-foot">
+        <span class="settings-msg" id="settings-msg"></span>
+        <button type="button" class="link" id="settings-cancel">Close</button>
+        <button type="button" id="settings-save">Save</button>
+      </div>
+    </div>
+  </div>
 
   <script>
     const PALETTE = ['#f85149', '#3fb950', '#d29922', '#2f81f7', '#bc8cff', '#39c5cf', '#e6edf3'];
@@ -584,6 +718,16 @@
     }
 
     let pollTimer = null;
+    let availableRepos = [];   // every scanned folder, in the configured order
+    let selectedRepos = [];    // the analyzed subset; empty means all of them
+    let pendingRepos = [];     // the selection being edited in the picker
+    let repoGroups = [];       // saved selections, [{name, repositories}]
+    let configData = null;     // the last /api/config answer
+    let configDraft = null;    // the configuration being edited in the dialog
+    let identityTimer = null;
+    let identityData = null;
+    let identityError = null;
+    let identityRepo = null;
     let currentQuery = '';
     let formInitialized = false;
     let lastData = null;
@@ -622,17 +766,23 @@
       btn.textContent = 'Refreshing…';
       setBusy(true);
       fetch('api/refresh' + currentQuery, { method: 'POST' })
-        .then(() => loadStats())
+        .then(() => { loadIdentity(); return loadStats(); })
         .catch(err => { setBusy(false); showError(err); });
     }
 
-    // Build the query string from the parameters form.
+    // Build the query string from the parameters form. The repository
+    // selection goes in it too, so the page URL always describes the view and
+    // can be shared as is: a saved selection travels as its group name, any
+    // other one as a "repo" parameter per repository.
     function buildQuery() {
       const val = id => document.getElementById(id).value.trim();
       const checked = id => document.getElementById(id).checked;
       const params = new URLSearchParams();
-      const repo = document.getElementById('f-repo').value;
-      if (repo) params.set('repo', repo);
+      if (selectedRepos.length && selectedRepos.length < availableRepos.length) {
+        const group = matchingGroup(selectedRepos);
+        if (group) params.set('group', group);
+        else selectedRepos.forEach(repo => params.append('repo', repo));
+      }
       if (val('f-weeks')) params.set('weeks', val('f-weeks'));
       if (val('f-delta')) params.set('delta', val('f-delta'));
       const countAll = checked('f-countall');
@@ -649,7 +799,7 @@
       if (formInitialized || !data || !data.params) return;
       formInitialized = true;
       const p = data.params;
-      populateRepoOptions(data.availableRepos || [], p.repo || '');
+      initRepoPicker(data.availableRepos || [], p.repos || []);
       document.getElementById('f-weeks').value = p.weeks || '';
       document.getElementById('f-delta').value = p.delta || '';
       document.getElementById('f-user').value = p.user || '';
@@ -659,22 +809,251 @@
       syncUserField();
     }
 
-    // Build the repository dropdown; hidden when there is only one repository.
-    function populateRepoOptions(repos, selected) {
-      const field = document.getElementById('repo-field');
-      if (repos.length < 2) {
-        field.style.display = 'none';
+    // ---- Repository picker ------------------------------------------------
+    // A multiple selection of the scanned folders, recallable as a named group.
+    // The picker is hidden when there is only one repository to choose from.
+
+    function repoLabel(folder) {
+      return folder.split('/').filter(Boolean).pop() || folder;
+    }
+
+    // initRepoPicker adopts the folders the server scans and the selection it
+    // applied (a link may carry one), then draws the picker.
+    function initRepoPicker(repos, selected) {
+      availableRepos = repos;
+      selectedRepos = (selected || []).filter(r => repos.includes(r));
+      document.getElementById('repo-field').style.display = repos.length < 2 ? 'none' : '';
+      renderRepoPicker();
+    }
+
+    // syncAvailableRepos follows the repositories the server scans, which a
+    // configuration saved from the settings dialog can change while the page
+    // is open. A selected repository that is gone drops out of the selection.
+    function syncAvailableRepos(repos) {
+      if (sameList(availableRepos, repos)) return;
+      availableRepos = repos;
+      selectedRepos = selectedRepos.filter(r => repos.includes(r));
+      document.getElementById('repo-field').style.display = repos.length < 2 ? 'none' : '';
+      renderRepoPicker();
+    }
+
+    // matchingGroup names the group a selection reproduces, so it can travel as
+    // a group name rather than as a list of paths.
+    function matchingGroup(selection) {
+      const wanted = new Set(selection);
+      const match = repoGroups.find(g => {
+        const repos = (g.repositories || []).filter(r => availableRepos.includes(r));
+        return repos.length === wanted.size && repos.every(r => wanted.has(r));
+      });
+      return match ? match.name : '';
+    }
+
+    function repoButtonLabel() {
+      if (!selectedRepos.length || selectedRepos.length === availableRepos.length) {
+        return `All repositories (${availableRepos.length})`;
+      }
+      const group = matchingGroup(selectedRepos);
+      if (group) return `${group} (${selectedRepos.length})`;
+      if (selectedRepos.length === 1) return repoLabel(selectedRepos[0]);
+      return `${selectedRepos.length} of ${availableRepos.length} repositories`;
+    }
+
+    // renderRepoPicker redraws the button and, when it is open, the panel.
+    function renderRepoPicker() {
+      const button = document.getElementById('repo-btn');
+      button.textContent = repoButtonLabel();
+      button.title = selectedRepos.length ? selectedRepos.join('\n') : 'Every scanned repository';
+      if (!document.getElementById('repo-panel').hidden) renderRepoPanel();
+    }
+
+    function renderRepoPanel() {
+      const filter = document.getElementById('repo-search').value.trim().toLowerCase();
+      const list = document.getElementById('repo-list');
+      const scroll = list.scrollTop;
+      list.innerHTML = '';
+
+      const shown = availableRepos.filter(r => !filter || r.toLowerCase().includes(filter));
+      if (!shown.length) {
+        list.appendChild(el('div', { class: 'picker-empty' }, 'No repository matches this filter.'));
+      }
+      shown.forEach(repo => {
+        const box = el('input', { type: 'checkbox' });
+        box.checked = pendingRepos.includes(repo);
+        box.addEventListener('change', () => toggleRepo(repo, box.checked));
+        const item = el('label', { class: 'picker-item', title: repo }, [
+          box,
+          el('span', { class: 'name' }, repoLabel(repo)),
+          el('span', { class: 'path' }, repo),
+        ]);
+        list.appendChild(item);
+      });
+      list.scrollTop = scroll;
+
+      renderPickerMeta();
+    }
+
+    // renderPickerMeta redraws what a change of selection affects outside the
+    // list itself: the group chips and the counter.
+    function renderPickerMeta() {
+      renderGroupChips();
+      const count = pendingRepos.length;
+      document.getElementById('repo-count').textContent = count
+        ? `${count} of ${availableRepos.length} selected`
+        : 'Nothing selected: every repository';
+    }
+
+    // renderGroupChips lists the saved groups: a chip applies its selection,
+    // its × forgets the group.
+    function renderGroupChips() {
+      const box = document.getElementById('repo-groups');
+      box.innerHTML = '';
+      if (!repoGroups.length) {
+        box.appendChild(el('span', { class: 'picker-empty' },
+          'No group yet. Pick repositories, then "Save as group…".'));
         return;
       }
-      field.style.display = '';
-      const sel = document.getElementById('f-repo');
-      sel.innerHTML = '';
-      sel.appendChild(el('option', { value: '' }, 'All repositories'));
-      repos.forEach(r => {
-        const name = r.split('/').filter(Boolean).pop() || r;
-        sel.appendChild(el('option', { value: r, title: r }, name));
+      const current = matchingGroup(pendingRepos);
+      repoGroups.forEach(group => {
+        const available = (group.repositories || []).filter(r => availableRepos.includes(r));
+        const pick = el('span', {}, `${group.name} (${available.length})`);
+        pick.addEventListener('click', () => {
+          pendingRepos = available;
+          renderRepoPanel();
+        });
+        const del = el('button', { type: 'button', class: 'del', title: `Delete the group ${group.name}` }, '×');
+        del.addEventListener('click', event => {
+          event.stopPropagation();
+          deleteGroup(group.name);
+        });
+        const c = chip([pick, del], group.repositories.join('\n'));
+        c.className = 'chip group' + (group.name === current ? ' on' : '');
+        box.appendChild(c);
       });
-      sel.value = selected;
+    }
+
+    // toggleRepo follows a ticked box; the box already shows the new state, so
+    // only what depends on the whole selection is redrawn.
+    function toggleRepo(repo, on) {
+      pendingRepos = on
+        ? availableRepos.filter(r => r === repo || pendingRepos.includes(r))
+        : pendingRepos.filter(r => r !== repo);
+      renderPickerMeta();
+    }
+
+    function openRepoPanel() {
+      pendingRepos = selectedRepos.slice();
+      document.getElementById('repo-search').value = '';
+      showGroupNameRow(false);
+      showPickerError('');
+      document.getElementById('repo-panel').hidden = false;
+      document.getElementById('repo-btn').setAttribute('aria-expanded', 'true');
+      renderRepoPanel();
+      document.getElementById('repo-search').focus();
+    }
+
+    function closeRepoPanel() {
+      document.getElementById('repo-panel').hidden = true;
+      document.getElementById('repo-btn').setAttribute('aria-expanded', 'false');
+    }
+
+    function toggleRepoPanel() {
+      if (document.getElementById('repo-panel').hidden) openRepoPanel();
+      else closeRepoPanel();
+    }
+
+    // applyRepoSelection narrows the whole page — statistics and identity
+    // cards — to the repositories ticked in the panel.
+    function applyRepoSelection() {
+      selectedRepos = pendingRepos.length === availableRepos.length ? [] : pendingRepos.slice();
+      closeRepoPanel();
+      renderRepoPicker();
+      applyParams();
+    }
+
+    // focusRepos narrows the analysis to the given repositories, from outside
+    // the picker (an identity card, for instance).
+    function focusRepos(repos) {
+      selectedRepos = availableRepos.filter(r => repos.includes(r));
+      renderRepoPicker();
+      applyParams();
+    }
+
+    function showPickerError(message) {
+      const box = document.getElementById('repo-error');
+      box.textContent = message;
+      box.hidden = !message;
+    }
+
+    function showGroupNameRow(show) {
+      document.getElementById('group-save-row').hidden = !show;
+      if (show) {
+        const input = document.getElementById('group-name');
+        input.value = matchingGroup(pendingRepos);
+        input.focus();
+        input.select();
+      }
+    }
+
+    // ---- Repository groups --------------------------------------------------
+    // Groups live in a JSON file on the server; the UI always sends the whole
+    // list back, so one request keeps the file and the page in step.
+
+    function loadGroups() {
+      return fetch('api/groups')
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => {
+          if (data) {
+            repoGroups = data.groups || [];
+            if (data.file) {
+              document.querySelector('#repo-groups-section .picker-label').title =
+                'Saved in ' + data.file;
+            }
+            renderRepoPicker();
+          }
+        })
+        .catch(() => { /* groups are optional: the picker works without them */ });
+    }
+
+    function saveGroups(groups) {
+      return fetch('api/groups', {
+        method: 'PUT',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ groups }),
+      }).then(r => {
+        if (r.status === 401 || r.status === 403) {
+          return r.text().then(t => {
+            throw new Error((t.trim() || 'not allowed') + ' — see Settings.');
+          });
+        }
+        if (!r.ok) return r.text().then(t => { throw new Error(t.trim() || ('HTTP ' + r.status)); });
+        return r.json();
+      }).then(data => {
+        repoGroups = data.groups || [];
+        showPickerError('');
+        renderRepoPicker();
+      }).catch(err => showPickerError('Could not save the groups: ' + err.message));
+    }
+
+    // saveCurrentGroup stores the ticked repositories under a name, replacing
+    // the group of that name when there is one.
+    function saveCurrentGroup() {
+      const name = document.getElementById('group-name').value.trim();
+      if (!name) {
+        showPickerError('A group needs a name.');
+        return;
+      }
+      if (!pendingRepos.length) {
+        showPickerError('Tick at least one repository to save a group.');
+        return;
+      }
+      const group = { name, repositories: pendingRepos.slice() };
+      const groups = repoGroups.filter(g => g.name.toLowerCase() !== name.toLowerCase()).concat([group]);
+      saveGroups(groups).then(() => showGroupNameRow(false));
+    }
+
+    function deleteGroup(name) {
+      if (!window.confirm(`Delete the group "${name}"?`)) return;
+      saveGroups(repoGroups.filter(g => g.name !== name));
     }
 
     function syncUserField() {
@@ -688,6 +1067,7 @@
       history.replaceState(null, '', currentQuery || location.pathname);
       clearTimeout(pollTimer);
       loadStats().catch(showError);
+      loadIdentity();
     }
 
     // drillDown filters the analysis to a single contributor, matching all of
@@ -722,8 +1102,645 @@
       URL.revokeObjectURL(url);
     }
 
+    // ---- Settings -----------------------------------------------------------
+    // The analysis config — the repositories scanned first of all — can be
+    // edited here and is applied by the server without a restart. Every change
+    // needs the edit token the config file carries; without one the server
+    // refuses to write anything, and this dialog stays read-only.
+
+    const TOKEN_KEY = 'gitcontrib-edit-token';
+
+    function editToken() {
+      try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
+    }
+
+    function setEditToken(token) {
+      try {
+        if (token) localStorage.setItem(TOKEN_KEY, token);
+        else localStorage.removeItem(TOKEN_KEY);
+      } catch (e) { /* a browser refusing storage only forgets the token */ }
+    }
+
+    // authHeaders carries the edit token on the requests that write.
+    function authHeaders(extra) {
+      const headers = Object.assign({}, extra || {});
+      const token = editToken();
+      if (token) headers['X-Gitcontrib-Token'] = token;
+      return headers;
+    }
+
+    // shortPath keeps the telling end of a long path, which is where a file
+    // name lives.
+    function shortPath(path, max = 56) {
+      return path.length > max ? '…' + path.slice(path.length - max) : path;
+    }
+
+    function settingsMsg(message, kind) {
+      const box = document.getElementById('settings-msg');
+      box.textContent = message || '';
+      box.className = 'settings-msg' + (kind ? ' ' + kind : '');
+    }
+
+    function loadConfig() {
+      return fetch('api/config', { headers: authHeaders() })
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => { if (data) configData = data; return data; });
+    }
+
+    function openSettings() {
+      settingsMsg('');
+      document.getElementById('settings').hidden = false;
+      renderSettings();
+      loadConfig().then(() => {
+        configDraft = JSON.parse(JSON.stringify((configData && configData.config) || {}));
+        renderSettings();
+      });
+    }
+
+    function closeSettings() {
+      document.getElementById('settings').hidden = true;
+    }
+
+    // sfield lays out one labelled input.
+    function sfield(label, input, hint) {
+      return el('div', { class: 'sfield' }, [
+        el('label', {}, label),
+        input,
+        hint ? el('span', { class: 'hint' }, hint) : null,
+      ]);
+    }
+
+    // textInput builds an input bound to a key of the config draft; an emptied
+    // field removes the value, which brings the built-in default back.
+    function textInput(key, attrs, parse) {
+      const value = configDraft[key];
+      const input = el('input', Object.assign({ type: 'text' }, attrs || {}));
+      input.value = value === null || value === undefined ? '' : value;
+      input.disabled = !canEdit();
+      input.addEventListener('input', () => {
+        const raw = input.value.trim();
+        configDraft[key] = raw === '' ? null : (parse ? parse(raw) : raw);
+      });
+      return input;
+    }
+
+    function checkInput(key, label) {
+      const box = el('input', { type: 'checkbox', id: 'cfg-' + key });
+      box.checked = !!configDraft[key];
+      box.disabled = !canEdit();
+      box.addEventListener('change', () => { configDraft[key] = box.checked; });
+      return el('div', { class: 'sfield check' }, [box, el('label', { for: 'cfg-' + key }, label)]);
+    }
+
+    function listInput(key) {
+      const input = el('input', { type: 'text', placeholder: 'regex, comma-separated' });
+      input.value = (configDraft[key] || []).join(', ');
+      input.disabled = !canEdit();
+      input.addEventListener('input', () => {
+        configDraft[key] = input.value.split(',').map(v => v.trim()).filter(Boolean);
+      });
+      return input;
+    }
+
+    function canEdit() {
+      return !!(configData && configData.authorized);
+    }
+
+    function renderSettings() {
+      const body = document.getElementById('settings-body');
+      body.innerHTML = '';
+      const file = document.getElementById('settings-file');
+      file.textContent = shortPath(configData ? configData.file : '');
+      file.title = configData ? configData.file : '';
+      document.getElementById('settings-save').disabled = !canEdit();
+
+      if (!configData) {
+        body.appendChild(el('p', { class: 'msg' }, [el('span', { class: 'spinner' }), 'Reading the configuration…']));
+        return;
+      }
+      configDraft = configDraft || JSON.parse(JSON.stringify(configData.config || {}));
+
+      body.appendChild(accessSection());
+      body.appendChild(repositoriesSection());
+      body.appendChild(defaultsSection());
+      body.appendChild(serverSection());
+    }
+
+    // accessSection is the lock: it says why editing is refused, and takes the
+    // token that lifts it.
+    function accessSection() {
+      if (!configData.editable) {
+        return el('div', { class: 'notice warn', html:
+          'This server is read-only: no edit token is configured. Add ' +
+          '<code>"web": { "editToken": "…" }</code> to its config file and restart it to allow ' +
+          'changes from here.' });
+      }
+      if (canEdit()) {
+        const forget = el('button', { type: 'button', class: 'link' }, 'Forget the token on this browser');
+        forget.addEventListener('click', () => {
+          setEditToken('');
+          loadConfig().then(renderSettings);
+        });
+        return el('div', { class: 'notice' }, [
+          el('span', {}, 'Editing is unlocked on this browser. '), forget,
+        ]);
+      }
+
+      const input = el('input', { type: 'password', id: 'cfg-token', placeholder: 'edit token' });
+      const unlock = el('button', { type: 'button' }, 'Unlock');
+      const submit = () => {
+        setEditToken(input.value.trim());
+        loadConfig().then(data => {
+          if (data && data.authorized) settingsMsg('Editing unlocked.', 'ok');
+          else { setEditToken(''); settingsMsg('That token was refused.', 'error'); }
+          renderSettings();
+        });
+      };
+      unlock.addEventListener('click', submit);
+      input.addEventListener('keydown', event => { if (event.key === 'Enter') submit(); });
+
+      return el('div', { class: 'notice' }, [
+        el('p', { style: 'margin:0 0 8px' }, 'The settings below are read-only until you unlock them with the edit token from the config file.'),
+        el('div', { class: 'srow' }, [el('span', { class: 'path' }, [input]), unlock]),
+      ]);
+    }
+
+    // repositoriesSection edits the scanned folders: the list the server
+    // analyzes, plus the field that resolves a path into repositories.
+    function repositoriesSection() {
+      const folders = configDraft.folders || [];
+      const rows = folders.map(folder => {
+        const remove = el('button', { type: 'button', class: 'icon', title: 'Remove this repository' }, '×');
+        remove.disabled = !canEdit();
+        remove.addEventListener('click', () => {
+          configDraft.folders = (configDraft.folders || []).filter(f => f !== folder);
+          renderSettings();
+        });
+        return el('div', { class: 'srow' }, [el('span', { class: 'path', title: folder }, folder), remove]);
+      });
+      if (!rows.length) {
+        rows.push(el('div', { class: 'srow' }, [el('span', { class: 'path ro' }, 'No repository configured yet.')]));
+      }
+
+      const path = el('input', { type: 'text', id: 'cfg-repo-path', placeholder: '/path/to/repository or to a folder holding several' });
+      path.disabled = !canEdit();
+      path.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); addRepository(); } });
+      const add = el('button', { type: 'button' }, 'Add');
+      add.disabled = !canEdit();
+      add.addEventListener('click', addRepository);
+
+      const children = [el('h3', {}, 'Repositories'), ...rows,
+        el('div', { class: 'srow' }, [el('span', { class: 'path' }, [path]), add]),
+        el('span', { class: 'hint' }, 'A folder that is not a repository is replaced by the repositories it holds. Paths may use ~ and $VARS.'),
+      ];
+
+      // What the server scans right now can differ from the file — a command
+      // line, or a current repository taking precedence at startup.
+      const scanned = configData.folders || [];
+      if (scanned.length && folders.length && !sameList(scanned, folders)) {
+        children.push(el('div', { class: 'notice', style: 'margin-top:10px' },
+          `Right now the server analyzes ${scanned.join(', ')} — saving applies the list above.`));
+      }
+      return el('div', { class: 'sgroup' }, children);
+    }
+
+    function sameList(a, b) {
+      return a.length === b.length && a.every((v, i) => v === b[i]);
+    }
+
+    // defaultsSection edits the analysis values the UI starts from.
+    function defaultsSection() {
+      return el('div', { class: 'sgroup' }, [
+        el('h3', {}, 'Default analysis'),
+        el('div', { class: 'sgrid' }, [
+          sfield('Weeks', textInput('weeks', { type: 'number', min: '1', max: '520' }, Number), 'Empty: one year'),
+          sfield('Delta', textInput('delta', { placeholder: 'e.g. 1y, 6m, 2w' }), 'Shifts the window into the past'),
+          sfield('User', textInput('user', { placeholder: 'name or email' }), 'Empty: the git config user'),
+          sfield('Include patterns', listInput('includePatterns')),
+          sfield('Exclude patterns', listInput('excludePatterns')),
+        ]),
+        el('div', { class: 'sgrid', style: 'margin-top:12px' }, [
+          checkInput('countAll', 'Count every contributor'),
+          checkInput('merge', 'Merge the repositories into one result'),
+        ]),
+      ]);
+    }
+
+    // serverSection shows the settings that belong to how the server was
+    // started: only the cache lifetime can change without restarting it.
+    function serverSection() {
+      const web = configData.web || {};
+      return el('div', { class: 'sgroup' }, [
+        el('h3', {}, 'Server'),
+        el('div', { class: 'sgrid' }, [
+          sfield('Cache lifetime', textInput('ttl', { placeholder: 'e.g. 30s, 5m, 1h' }), 'Applied as soon as it is saved'),
+        ]),
+        el('div', { class: 'srow', style: 'margin-top:10px' }, [
+          el('span', { class: 'path ro' }, `Listening on ${web.addr || '—'} · cache ${web.cacheFile || '—'} · groups ${web.groupsFile || '—'}`),
+        ]),
+        el('span', { class: 'hint' }, 'These three follow the command line and need a restart to change.'),
+      ]);
+    }
+
+    // addRepository asks the server what repositories a path holds, and adds
+    // them to the list being edited (nothing is written before Save).
+    function addRepository() {
+      const input = document.getElementById('cfg-repo-path');
+      const path = input.value.trim();
+      if (!path) return;
+      settingsMsg('Looking for repositories…');
+      fetch('api/repositories/scan', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ path }),
+      }).then(r => {
+        if (!r.ok) return r.text().then(t => { throw new Error(t.trim() || ('HTTP ' + r.status)); });
+        return r.json();
+      }).then(data => {
+        const found = data.folders || [];
+        const known = configDraft.folders || [];
+        configDraft.folders = known.concat(found.filter(f => !known.includes(f)));
+        input.value = '';
+        renderSettings();
+        settingsMsg(`${found.length} repositor${found.length === 1 ? 'y' : 'ies'} added — save to apply.`, 'ok');
+      }).catch(err => settingsMsg(err.message, 'error'));
+    }
+
+    function saveSettings() {
+      if (!canEdit()) return;
+      settingsMsg('Saving…');
+      fetch('api/config', {
+        method: 'PUT',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ config: configDraft }),
+      }).then(r => {
+        if (r.status === 401) {
+          setEditToken('');
+          throw new Error('The edit token was refused. Unlock again to save.');
+        }
+        if (!r.ok) return r.text().then(t => { throw new Error(t.trim() || ('HTTP ' + r.status)); });
+        return r.json();
+      }).then(data => {
+        configData = data;
+        configDraft = JSON.parse(JSON.stringify(data.config || {}));
+        settingsMsg('Saved. The new configuration is applied.', 'ok');
+        renderSettings();
+        // The scanned repositories may have changed: everything is re-read.
+        loadGroups();
+        loadStats().catch(showError);
+        loadIdentity();
+      }).catch(err => {
+        settingsMsg(err.message, 'error');
+        loadConfig().then(renderSettings);
+      });
+    }
+
+    // ---- Identity cards ---------------------------------------------------
+    // The identity of the repositories themselves: what they are, what their
+    // whole history says about contributions, and how much code their current
+    // version holds. They come from /api/identity, which does not depend on the
+    // analysis window, so they are fetched (and cached) separately.
+
+    function fmtInt(n) {
+      return (n || 0).toLocaleString();
+    }
+
+    function fmtBytes(bytes) {
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let value = bytes || 0, unit = 0;
+      while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+      return (unit === 0 ? value : value.toFixed(value < 10 ? 1 : 0)) + ' ' + units[unit];
+    }
+
+    function fmtAge(days) {
+      if (!days) return '—';
+      if (days >= 730) return (days / 365.25).toFixed(1) + ' years';
+      if (days >= 60) return Math.round(days / 30.44) + ' months';
+      return days + ' day' + (days === 1 ? '' : 's');
+    }
+
+    // A zero time.Time marshals as year 1: the repository has no such date.
+    function fmtDay(iso) {
+      return (!iso || iso.startsWith('0001-01-01')) ? '—' : fmtDate(iso);
+    }
+
+    function pct(value, total) {
+      return (total > 0 ? Math.round((value / total) * 100) : 0) + '%';
+    }
+
+    function idRow(label, value, title) {
+      const row = el('div', { class: 'idrow' }, [
+        el('span', { class: 'k' }, label),
+        el('span', { class: 'v' }, String(value)),
+      ]);
+      if (title) row.title = title;
+      return row;
+    }
+
+    function idGroup(title, rows) {
+      return el('div', { class: 'idgroup' }, [el('h4', {}, title)].concat(rows.filter(Boolean)));
+    }
+
+    // branchChip names the checked-out branch; long branch names are cut by
+    // the chip's own ellipsis rather than pushing the other chips away.
+    function branchChip(branch) {
+      const c = chip(branch, 'Current branch: ' + branch);
+      c.className = 'chip branch';
+      return c;
+    }
+
+    function chip(children, title) {
+      const c = el('span', { class: 'chip' }, children);
+      if (title) c.title = title;
+      return c;
+    }
+
+    // contributionRows summarizes the whole history of a repository.
+    // windowCommits, when known, recalls how much of it the analyzed window
+    // (with its current filters) covers.
+    function contributionRows(history, windowCommits) {
+      const h = history || {};
+      const top = (h.topAuthors || [])[0];
+      return [
+        idRow('Commits', fmtInt(h.commits)),
+        windowCommits == null ? null :
+          idRow('In current window', fmtInt(windowCommits), 'Commits matching the parameters above'),
+        idRow('Contributors', fmtInt(h.contributors)),
+        top ? idRow('Top author', `${top.author} (${fmtInt(top.commits)})`, top.email) : null,
+        idRow('First commit', fmtDay(h.firstCommit)),
+        idRow('Last commit', fmtDay(h.lastCommit)),
+        idRow('Age', fmtAge(h.ageInDays)),
+        idRow('Active days', fmtInt(h.activeDays), 'Distinct days holding at least one commit'),
+        idRow('Commits / week', (h.commitsPerWeek || 0).toFixed(1)),
+        idRow('Merge commits', fmtInt(h.mergeCommits)),
+      ];
+    }
+
+    // codeRows measures the current version of the code: the files tracked by
+    // HEAD, vendored directories excluded.
+    function codeRows(code) {
+      const c = code || {};
+      const deps = c.dependencies || [];
+      const ecosystems = [...new Set(deps.map(d => d.ecosystem))].join(', ');
+      const top = (c.languages || [])[0];
+      return [
+        idRow('Lines of code', fmtInt(c.codeLines), 'Lines of the source files, documentation and data excluded'),
+        idRow('All lines', fmtInt(c.lines), 'Every text file tracked by HEAD'),
+        top ? idRow('Main language', `${top.name} (${pct(top.lines, c.lines)})`) : null,
+        idRow('Languages', fmtInt((c.languages || []).length)),
+        idRow('Files', fmtInt(c.files), `${fmtInt(c.codeFiles)} source files · ${fmtInt(c.binaryFiles)} binary · ${fmtInt(c.vendored)} vendored files ignored`),
+        idRow('Size', fmtBytes(c.bytes)),
+        idRow('Packages', fmtInt(c.packages), 'Directories holding at least one source file'),
+        idRow('Directories', fmtInt(c.directories)),
+        idRow('Dependencies', c.totalDeps ? `${fmtInt(c.directDeps)} direct / ${fmtInt(c.totalDeps)}` : '—', ecosystems),
+      ];
+    }
+
+    // languageBar draws the share of each language in the current code, by
+    // lines, as a single stacked bar plus its legend.
+    function languageBar(languages) {
+      const langs = (languages || []).filter(l => l.lines > 0);
+      if (!langs.length) return null;
+      const total = langs.reduce((s, l) => s + l.lines, 0);
+      const items = langs.slice(0, 6).map((l, i) => ({ label: l.name, value: l.lines, color: PALETTE[i % PALETTE.length] }));
+      const rest = langs.slice(6).reduce((s, l) => s + l.lines, 0);
+      if (rest > 0) items.push({ label: 'Other', value: rest, color: 'var(--border)' });
+
+      const bar = el('div', { class: 'langbar' }, items.map(it => el('div', {
+        style: `width:${(it.value / total) * 100}%;background:${it.color}`,
+        title: `${it.label}: ${fmtInt(it.value)} lines (${pct(it.value, total)})`,
+      })));
+      const legend = el('div', { class: 'idlegend' }, items.map(it => el('span', { class: 'item' }, [
+        el('span', { class: 'swatch', style: `background:${it.color}` }),
+        `${it.label} ${pct(it.value, total)}`,
+      ])));
+      return el('div', {}, [bar, legend]);
+    }
+
+    function authorChips(authors) {
+      if (!authors || !authors.length) return null;
+      return el('div', { class: 'idchips' }, authors.map(a =>
+        chip([a.author + ' ', el('b', {}, fmtInt(a.commits))], a.email)));
+    }
+
+    function dependencyChips(deps) {
+      if (!deps || !deps.length) return null;
+      return el('div', { class: 'idchips' }, deps.slice(0, 8).map(d => {
+        const parts = [d.ecosystem + ' ', el('b', {}, fmtInt(d.direct)), ' direct'];
+        if (d.indirect) parts.push(' · ', el('b', {}, fmtInt(d.indirect)), ' indirect');
+        if (d.dev) parts.push(' · ', el('b', {}, fmtInt(d.dev)), ' dev');
+        return chip(parts, d.manifest || d.ecosystem);
+      }));
+    }
+
+    // canSelectRepo reports whether clicking a card can narrow the analysis to
+    // that repository (it must be a scanned folder, and not the only one
+    // already selected).
+    function canSelectRepo(folder) {
+      return !!folder && availableRepos.includes(folder) &&
+        !(selectedRepos.length === 1 && selectedRepos[0] === folder);
+    }
+
+    function selectRepo(folder) {
+      focusRepos([folder]);
+    }
+
+    // identityCard renders one repository's card.
+    function identityCard(card, windowCommits) {
+      let name = document.createTextNode(card.name);
+      if (canSelectRepo(card.folder)) {
+        name = el('button', { type: 'button', title: 'Analyze only this repository' }, card.name);
+        name.addEventListener('click', () => selectRepo(card.folder));
+      }
+
+      const body = [
+        el('div', { class: 'idhead' }, [
+          el('h3', { class: 'idname' }, [name]),
+          el('div', { class: 'idchips' }, [
+            card.branch ? branchChip(card.branch) : null,
+            card.tags ? chip([el('b', {}, fmtInt(card.tags)), ' tags']) : null,
+            card.branches ? chip([el('b', {}, fmtInt(card.branches)), ' branches']) : null,
+          ]),
+        ]),
+        el('div', {}, [
+          el('div', { class: 'idmeta' }, card.path || card.folder),
+          card.remote ? el('div', { class: 'idmeta' }, card.remote) : null,
+          card.headSha ? el('div', { class: 'idmeta' },
+            `HEAD ${card.headSha.slice(0, 7)} · ${card.headSubject} · ${fmtDay(card.headDate)}`) : null,
+        ]),
+      ];
+
+      if (card.error) {
+        body.push(el('div', { class: 'iderr' }, card.error));
+        return el('div', { class: 'idcard' }, body);
+      }
+
+      body.push(el('div', { class: 'idcols' }, [
+        idGroup('Contributions (all time)', contributionRows(card.history, windowCommits)),
+        idGroup('Code (current version)', codeRows(card.code)),
+      ]));
+      body.push(languageBar((card.code || {}).languages));
+      body.push(authorChips((card.history || {}).topAuthors));
+      body.push(dependencyChips((card.code || {}).dependencies));
+      return el('div', { class: 'idcard' }, body.filter(Boolean));
+    }
+
+    // overviewCard renders the identity of every scanned repository at once.
+    function overviewCard(all, windowCommits) {
+      const body = [
+        el('div', { class: 'idhead' }, [
+          el('h3', { class: 'idname' }, 'All repositories'),
+          el('div', { class: 'idchips' }, [
+            chip([el('b', {}, fmtInt(all.repositories)), ' repositories']),
+            all.failed ? chip([el('b', {}, fmtInt(all.failed)), ' unreadable']) : null,
+            all.tags ? chip([el('b', {}, fmtInt(all.tags)), ' tags']) : null,
+            all.branches ? chip([el('b', {}, fmtInt(all.branches)), ' branches']) : null,
+          ]),
+        ]),
+        el('div', { class: 'idcols' }, [
+          idGroup('Contributions (all time)', contributionRows(all.history, windowCommits)),
+          idGroup('Code (current version)', codeRows(all.code)),
+        ]),
+        languageBar((all.code || {}).languages),
+        authorChips((all.history || {}).topAuthors),
+        dependencyChips((all.code || {}).dependencies),
+      ];
+      return el('div', { class: 'idcard all' }, body.filter(Boolean));
+    }
+
+    // identitySection is the placeholder the cards are rendered into; it is
+    // rebuilt with the rest of the page and filled from the last identity
+    // payload, whether or not it has arrived yet.
+    function identitySection() {
+      return el('section', {}, [
+        el('h2', { class: 'section-title' }, 'Identity'),
+        el('div', { id: 'identity-body' }),
+      ]);
+    }
+
+    // windowCommitsOf maps a repository folder to its commit count in the
+    // analyzed window; a scanned folder absent from the results simply had no
+    // commit. Merged results cover several folders at once, so they are left
+    // out rather than attributed to one of them.
+    function windowCommitsOf(folder) {
+      if (!lastData || (lastData.params || {}).merge) return null;
+      const match = (lastData.repositories || []).find(r => r.folder === folder);
+      if (match) return match.commits;
+      return (lastData.availableRepos || []).includes(folder) ? 0 : null;
+    }
+
+    function renderIdentity() {
+      const body = document.getElementById('identity-body');
+      if (!body) return;
+      body.innerHTML = '';
+
+      if (identityError) {
+        body.appendChild(el('p', { class: 'msg' }, 'Failed to load the identity cards: ' + identityError));
+        return;
+      }
+      if (!identityData) {
+        body.appendChild(el('p', { class: 'msg' }, [el('span', { class: 'spinner' }), 'Reading the repositories…']));
+        return;
+      }
+
+      const cards = identityData.repositories || [];
+      const grid = el('div', { class: 'idgrid' });
+      // With a single repository its card already is the whole picture.
+      if (cards.length > 1) {
+        grid.appendChild(overviewCard(identityData.all || {}, lastData ? lastData.totalCommits : null));
+      }
+      cards.forEach(card => grid.appendChild(identityCard(card, windowCommitsOf(card.folder))));
+      body.appendChild(grid);
+    }
+
+    // loadIdentity fetches the cards for the selected repository (or all of
+    // them), keeping the previous ones on screen unless the selection changed.
+    function loadIdentity() {
+      // The cards only depend on which repositories are looked at.
+      const selection = new URLSearchParams();
+      const query = new URLSearchParams(currentQuery.replace(/^\?/, ''));
+      query.getAll('repo').forEach(repo => selection.append('repo', repo));
+      if (query.get('group')) selection.set('group', query.get('group'));
+      const key = selection.toString();
+      if (key !== identityRepo) {
+        identityRepo = key;
+        identityData = null;
+        renderIdentity();
+      }
+      identityError = null;
+      clearTimeout(identityTimer);
+      return fetch('api/identity' + (key ? '?' + key : ''))
+        .then(r => {
+          if (!r.ok) return r.text().then(t => { throw new Error(t.trim() || ('HTTP ' + r.status)); });
+          return r.json();
+        })
+        .then(data => {
+          identityData = data;
+          renderIdentity();
+          // A card being rebuilt in the background lands on the next poll.
+          if (data.refreshing) identityTimer = setTimeout(loadIdentity, 3000);
+        })
+        .catch(err => { identityError = err.message; renderIdentity(); });
+    }
+
+    // emptyState explains a result holding no commit — which is a legitimate
+    // answer, not a failure: it spells out the three filters that can empty a
+    // view and offers to loosen the ones actually narrowing it. Selecting
+    // repositories nobody has touched lately is the usual cause, and the
+    // identity cards below give each repository's last commit.
+    function emptyState(data) {
+      const p = data.params || {};
+      const repos = selectedRepos.length
+        ? `${selectedRepos.length} of ${availableRepos.length} repositories (${selectedRepos.map(repoLabel).join(', ')})`
+        : `${availableRepos.length || data.analyzedRepos} repositories`;
+      const who = (p.countAll || !p.user) ? 'every contributor' : p.user;
+      const when = `${fmtDate(data.beginOfScan)} → ${fmtDate(data.endOfScan)}`;
+
+      const actions = [];
+      if (selectedRepos.length) {
+        actions.push(action('Analyze every repository', () => focusRepos([])));
+      }
+      if (!p.countAll && p.user) {
+        actions.push(action('Count every contributor', () => {
+          document.getElementById('f-countall').checked = true;
+          syncUserField();
+          applyParams();
+        }));
+      }
+      const weeks = p.weeks || Math.round((data.durationInDays || 0) / 7) || 52;
+      const wider = Math.min(520, Math.max(weeks * 4, 4));
+      if (wider > weeks) {
+        actions.push(action(`Look back ${wider} weeks`, () => {
+          document.getElementById('f-weeks').value = wider;
+          applyParams();
+        }));
+      }
+
+      return el('div', { class: 'empty' }, [
+        el('h2', {}, 'No commits in this view'),
+        el('p', {}, [
+          'Nothing matched ',
+          el('span', { class: 'filters' }, repos),
+          ', ',
+          el('span', { class: 'filters' }, who),
+          ', ',
+          el('span', { class: 'filters' }, when),
+          '.',
+        ]),
+        el('p', {}, 'The repositories are there — they just hold no commit under these parameters. The identity cards below show when each of them was last touched.'),
+        el('div', { class: 'actions' }, actions),
+      ]);
+    }
+
+    function action(label, onClick) {
+      const b = el('button', { type: 'button' }, label);
+      b.addEventListener('click', onClick);
+      return b;
+    }
+
     function render(data) {
       lastData = data;
+      syncAvailableRepos(data.availableRepos || []);
       document.getElementById('scan-info').textContent =
         `${data.user} · ${fmtDate(data.beginOfScan)} → ${fmtDate(data.endOfScan)}`;
       populateForm(data);
@@ -734,7 +1751,9 @@
       app.innerHTML = '';
 
       if (data.totalCommits === 0) {
-        app.appendChild(el('p', { class: 'msg' }, 'No commits found to parse.'));
+        app.appendChild(emptyState(data));
+        app.appendChild(identitySection());
+        renderIdentity();
         return;
       }
 
@@ -749,6 +1768,9 @@
         el('h2', { class: 'section-title' }, 'Highlights'),
         el('div', { class: 'grid cards' }, computeHighlights(data)),
       ]));
+
+      app.appendChild(identitySection());
+      renderIdentity();
 
       app.appendChild(el('section', {}, panel('Commit activity', calendar(data.calendar || []))));
 
@@ -811,15 +1833,58 @@
     }
 
     document.getElementById('refresh-btn').addEventListener('click', triggerRefresh);
+    document.getElementById('settings-btn').addEventListener('click', openSettings);
+    document.getElementById('settings-close').addEventListener('click', closeSettings);
+    document.getElementById('settings-cancel').addEventListener('click', closeSettings);
+    document.getElementById('settings-save').addEventListener('click', saveSettings);
+    // A click on the backdrop, outside the dialog, closes it.
+    document.getElementById('settings').addEventListener('click', event => {
+      if (event.target.id === 'settings') closeSettings();
+    });
     document.getElementById('export-btn').addEventListener('click', exportJSON);
     document.getElementById('params-form').addEventListener('submit', applyParams);
     document.getElementById('f-countall').addEventListener('change', syncUserField);
-    // Selecting a repository applies immediately.
-    document.getElementById('f-repo').addEventListener('change', applyParams);
+
+    document.getElementById('repo-btn').addEventListener('click', toggleRepoPanel);
+    document.getElementById('repo-search').addEventListener('input', renderRepoPanel);
+    // The panel lives inside the parameters form: Enter applies the selection
+    // rather than submitting the form behind it.
+    document.getElementById('repo-search').addEventListener('keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); applyRepoSelection(); }
+    });
+    document.getElementById('repo-all').addEventListener('click', () => {
+      pendingRepos = availableRepos.slice();
+      renderRepoPanel();
+    });
+    document.getElementById('repo-none').addEventListener('click', () => {
+      pendingRepos = [];
+      renderRepoPanel();
+    });
+    document.getElementById('repo-apply').addEventListener('click', applyRepoSelection);
+    document.getElementById('group-save-toggle').addEventListener('click', () => showGroupNameRow(true));
+    document.getElementById('group-cancel').addEventListener('click', () => showGroupNameRow(false));
+    document.getElementById('group-save').addEventListener('click', saveCurrentGroup);
+    document.getElementById('group-name').addEventListener('keydown', event => {
+      if (event.key === 'Enter') { event.preventDefault(); saveCurrentGroup(); }
+    });
+    // The panel closes on a click outside of it, or on Escape. A click on a
+    // node the panel has just redrawn away is not a click outside of it.
+    document.addEventListener('click', event => {
+      const field = document.getElementById('repo-field');
+      if (!document.contains(event.target)) return;
+      if (!field.contains(event.target)) closeRepoPanel();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key !== 'Escape') return;
+      if (!document.getElementById('settings').hidden) closeSettings();
+      closeRepoPanel();
+    });
     // Start from the parameters carried in the page URL, if any; the form is
     // then filled from the parameters the server echoes back.
     currentQuery = window.location.search;
+    loadGroups();
     loadStats().catch(showError);
+    loadIdentity();
   </script>
 </body>
 </html>

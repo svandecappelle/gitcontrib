@@ -129,6 +129,11 @@ func commands() []*cli.Command {
 					Value: "",
 					Usage: "Path to the JSON cache file (default: <home>/.gitcontrib-cache.json)",
 				},
+				&cli.StringFlag{
+					Name:  "groups-file",
+					Value: "",
+					Usage: "Path to the JSON file holding the repository groups edited from the web UI (default: <home>/.gitcontrib-groups.json)",
+				},
 			),
 		},
 		{
@@ -291,7 +296,11 @@ func runDashboard(c *cli.Context) error {
 }
 
 func runWeb(c *cli.Context) error {
-	cfg, err := stats.LoadConfig(c.String("config"))
+	configFile := c.String("config")
+	if configFile == "" {
+		configFile = stats.DefaultConfigPath()
+	}
+	cfg, err := stats.LoadConfig(configFile)
 	if err != nil {
 		return err
 	}
@@ -310,7 +319,24 @@ func runWeb(c *cli.Context) error {
 		cacheFile = defaultCacheFile()
 	}
 
-	return stats.Serve(opts, strFlag(c, "addr", cfg.Web.Addr), ttl, cacheFile)
+	groupsFile := strFlag(c, "groups-file", cfg.Web.GroupsFile)
+	if groupsFile == "" {
+		groupsFile = defaultGroupsFile()
+	}
+
+	editToken := ""
+	if cfg.Web.EditToken != nil {
+		editToken = *cfg.Web.EditToken
+	}
+
+	return stats.Serve(opts, stats.ServeOptions{
+		Addr:       strFlag(c, "addr", cfg.Web.Addr),
+		TTL:        ttl,
+		CacheFile:  cacheFile,
+		GroupsFile: groupsFile,
+		ConfigFile: configFile,
+		EditToken:  editToken,
+	})
 }
 
 // defaultCacheFile returns the default web cache path, in the user's home
@@ -321,6 +347,16 @@ func defaultCacheFile() string {
 		return "gitcontrib-cache.json"
 	}
 	return filepath.Join(home, ".gitcontrib-cache.json")
+}
+
+// defaultGroupsFile returns the default path of the repository-groups file,
+// beside the cache in the user's home directory.
+func defaultGroupsFile() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "gitcontrib-groups.json"
+	}
+	return filepath.Join(home, ".gitcontrib-groups.json")
 }
 
 func addToScan(folder string) error {

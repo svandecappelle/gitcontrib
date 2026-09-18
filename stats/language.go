@@ -99,3 +99,24 @@ func languageForFile(name string) string {
 	}
 	return strings.TrimPrefix(ext, ".")
 }
+
+// codeLanguages are the language labels that count as source code, as opposed
+// to data, configuration or documentation. It drives the "lines of code" and
+// "packages" counters of an identity card: a directory holding one of these
+// files is a package, a directory holding only a README is not.
+var codeLanguages = map[string]bool{
+	"Go": true, "JavaScript": true, "TypeScript": true, "Python": true,
+	"Ruby": true, "PHP": true, "Java": true, "Kotlin": true, "Scala": true,
+	"C": true, "C++": true, "C#": true, "Rust": true, "Swift": true,
+	"Objective-C": true, "Dart": true, "Lua": true, "R": true, "Perl": true,
+	"Elixir": true, "Clojure": true, "Haskell": true, "Shell": true,
+	"PowerShell": true, "HTML": true, "CSS": true, "Sass": true, "Less": true,
+	"Vue": true, "Svelte": true, "SQL": true, "Protobuf": true,
+	"Terraform": true, "Dockerfile": true, "Makefile": true, "Gradle": true,
+}
+
+// isCodeLanguage reports whether a language label returned by languageForFile
+// is source code.
+func isCodeLanguage(lang string) bool {
+	return codeLanguages[lang]
+}

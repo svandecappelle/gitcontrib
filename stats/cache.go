@@ -11,14 +11,16 @@ import (
 )
 
 // Params holds the analysis parameters a client can tweak. New folders cannot
-// be introduced: Repo may only select one of the folders fixed at startup.
+// be introduced: Repos may only select among the folders fixed at startup, and
+// Group names a saved selection of those folders.
 type Params struct {
 	Weeks    int      // 0 keeps the server default
 	Delta    string   // "" means no offset
 	User     string   // "" means no user filter
 	CountAll bool     // analyze every user (ignores User)
 	Merge    bool     // merge all folders into a single result
-	Repo     string   // "" means all repositories; otherwise a single folder
+	Repos    []string // empty means every repository
+	Group    string   // a saved group of repositories, used when Repos is empty
 	Include  []string // file include patterns
 	Exclude  []string // file exclude patterns
 }
@@ -35,29 +37,107 @@ type cacheEntry struct {
 // time a parameter set is requested, in the background afterwards. At most one
 // refresh runs at a time per parameter set.
 type statsCache struct {
-	baseOpts LaunchOptions // folders and startup defaults
+	file   string
+	groups *groupStore // saved repository selections, for the "group" parameter
+
+	// startupOpts and startupTTL are how the server was started — command line
+	// and config file. A config saved from the web UI is applied on top of
+	// them, so clearing a value there brings the startup value back rather than
+	// keeping whatever was running.
+	startupOpts LaunchOptions
+	startupTTL  time.Duration
+
+	// optsMu guards the options the server currently analyzes with: they are
+	// fixed at startup, but a config saved from the web UI replaces them.
+	optsMu   sync.RWMutex
+	baseOpts LaunchOptions
 	ttl      time.Duration
-	file     string
 
 	mu         sync.RWMutex
 	entries    map[string]*cacheEntry
 	refreshing map[string]bool
 }
 
-func newStatsCache(baseOpts LaunchOptions, ttl time.Duration, file string) *statsCache {
+// options returns the options the server currently analyzes with.
+func (c *statsCache) options() LaunchOptions {
+	c.optsMu.RLock()
+	defer c.optsMu.RUnlock()
+	return c.baseOpts
+}
+
+// folders returns the repositories the server currently scans.
+func (c *statsCache) folders() []string {
+	return c.options().Folders
+}
+
+// setOptions replaces the options every later request starts from. Cached
+// results are keyed by their own options, so they stay valid: the entries that
+// no longer match any request simply stop being served.
+func (c *statsCache) setOptions(opts LaunchOptions, ttl time.Duration) {
+	c.optsMu.Lock()
+	c.baseOpts = opts
+	c.ttl = ttl
+	c.optsMu.Unlock()
+}
+
+// lifetime is how long an entry stays fresh.
+func (c *statsCache) lifetime() time.Duration {
+	c.optsMu.RLock()
+	defer c.optsMu.RUnlock()
+	return c.ttl
+}
+
+func newStatsCache(baseOpts LaunchOptions, ttl time.Duration, file string, groups *groupStore) *statsCache {
+	if groups == nil {
+		groups = newGroupStore("")
+	}
 	return &statsCache{
-		baseOpts:   baseOpts,
-		ttl:        ttl,
-		file:       file,
-		entries:    make(map[string]*cacheEntry),
-		refreshing: make(map[string]bool),
+		baseOpts:    baseOpts,
+		ttl:         ttl,
+		startupOpts: baseOpts,
+		startupTTL:  ttl,
+		file:        file,
+		groups:      groups,
+		entries:     make(map[string]*cacheEntry),
+		refreshing:  make(map[string]bool),
 	}
 }
 
-// optsFor turns a Params into the LaunchOptions to scan with, keeping the
-// server's fixed folders and applying the client overrides on top.
-func (c *statsCache) optsFor(p Params) LaunchOptions {
-	opts := c.baseOpts
+// folderSelection resolves the repositories a request applies to: the ones it
+// names, the ones of the group it names, or — when it names neither — every
+// configured folder. Selecting an unknown folder is an error; a group that has
+// outlived some of its repositories keeps the ones still scanned.
+func (c *statsCache) folderSelection(p Params) ([]string, error) {
+	scanned := c.folders()
+	if len(p.Repos) > 0 {
+		for _, repo := range p.Repos {
+			if !containsFolder(scanned, repo) {
+				return nil, fmt.Errorf("unknown repository: %s", repo)
+			}
+		}
+		return intersectFolders(p.Repos, scanned), nil
+	}
+
+	if p.Group != "" {
+		group, ok := c.groups.find(p.Group)
+		if !ok {
+			return nil, fmt.Errorf("unknown group: %s", p.Group)
+		}
+		folders := intersectFolders(group.Repositories, scanned)
+		if len(folders) == 0 {
+			return nil, fmt.Errorf("group %s holds no scanned repository", group.Name)
+		}
+		return folders, nil
+	}
+
+	return scanned, nil
+}
+
+// optsFor turns a Params into the LaunchOptions to scan with, restricted to
+// the folders the request selected and with the client overrides applied on
+// top of the server's defaults.
+func (c *statsCache) optsFor(p Params, folders []string) LaunchOptions {
+	opts := c.options()
 	if p.Weeks > 0 {
 		opts.DurationInWeeks = p.Weeks
 	}
@@ -65,13 +145,7 @@ func (c *statsCache) optsFor(p Params) LaunchOptions {
 	opts.Merge = p.Merge
 	opts.PatternToInclude = p.Include
 	opts.PatternToExclude = p.Exclude
-
-	// A specific repository restricts the scan to that single folder (its stats
-	// are then shown on their own, not grouped with the others).
-	if p.Repo != "" {
-		opts.Folders = []string{p.Repo}
-		opts.Merge = false
-	}
+	opts.Folders = folders
 
 	switch {
 	case p.CountAll || p.User == "":
@@ -226,6 +300,7 @@ func (c *statsCache) state(key string) (entry *cacheEntry, stale, refreshing boo
 	if entry == nil {
 		return nil, true, refreshing
 	}
-	stale = c.ttl > 0 && time.Since(entry.UpdatedAt) > c.ttl
+	ttl := c.lifetime()
+	stale = ttl > 0 && time.Since(entry.UpdatedAt) > ttl
 	return entry, stale, refreshing
 }
