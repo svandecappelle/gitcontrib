@@ -20,6 +20,8 @@ API.
   named **groups** of repositories saved in a JSON file and edited from the UI.
 - **Settings editable from the web UI** — repositories included — guarded by an
   edit token, and applied without restarting the server.
+- **Update (pull) repositories from the web UI**, one or all of them, by
+  fast-forward only and never when the worktree holds local changes.
 - Author identities grouped by email (like `git shortlog`), with `.mailmap`
   support.
 
@@ -156,6 +158,8 @@ by Conventional Commits type.
   a filter box, "All"/"None", and one-click **groups** (see below).
 - A **Settings** dialog edits the configuration — the scanned repositories
   first of all — once unlocked with the edit token (see below).
+- **Pull** buttons update the repositories, one by one or all at once (see
+  below).
 - **Clicking a repository's card name** narrows the whole analysis to it.
 - A **parameters form** re-runs the analysis on the fly (weeks, delta, user or
   all users, repositories, include/exclude patterns).
@@ -246,6 +250,33 @@ a refresh is requested. The first build of a large repository walks its whole
 history, so it can take a moment; the page shows the cards as soon as they are
 ready.
 
+### Updating the repositories
+
+The identity section carries the updates: a **Pull** button on each card, and a
+**Pull N repositories** button updating every repository on screen that can be.
+Each card shows the state of its worktree — `clean`, `2 behind`, or
+`3 local changes` — read live from git.
+
+Two rules keep an update from ever losing work:
+
+- a repository whose worktree holds **local changes to tracked files** is left
+  alone (untracked files do not block it, and git still refuses to overwrite
+  one);
+- the pull is a **fast-forward only** (`git pull --ff-only`): a branch that has
+  diverged from its upstream is reported and left as it is, never merged or
+  rebased.
+
+A repository with no upstream branch, or with a detached HEAD, is skipped with
+that as its reason. Whatever moved drops the cached statistics covering it and
+rebuilds its identity card, so the page tells the truth right after an update.
+
+Updating goes through the `git` command (which must be on the server's `PATH`),
+so it uses the credentials, SSH agent and configuration you already pull with —
+but it never asks a question: `GIT_TERMINAL_PROMPT=0` and an SSH batch mode are
+forced, so a repository needing a passphrase is reported as a failure instead of
+hanging the server. Like every other change made from the UI, pulling needs the
+edit token.
+
 ### Settings and the edit token
 
 The **Settings** dialog writes to the config file and applies the result at
@@ -311,6 +342,8 @@ parameter set is cached independently.
 | `GET /api/config` | The editable config, without the token. |
 | `PUT /api/config` | Save the config and apply it (`POST` also accepted). 🔒 |
 | `POST /api/repositories/scan` | Resolve a path into the repositories it holds. 🔒 |
+| `GET /api/repositories/status` | The worktree state of the selected repositories. |
+| `POST /api/repositories/pull` | Fast-forward the clean repositories. 🔒 |
 | `POST /api/refresh` | Trigger a background refresh (returns `202`). |
 
 Both API endpoints accept the analysis parameters as query string:
@@ -358,6 +391,17 @@ repository list — are a `400`, and change nothing.
 `POST /api/repositories/scan` takes `{"path": "…"}` and answers
 `{"path": …, "folders": [...]}`: what the path resolves to, without saving
 anything. It is how the UI turns a typed path into repositories.
+
+`GET /api/repositories/status` answers one entry per repository with its
+`branch`, `upstream`, `ahead`/`behind` counts, the number of `changes` and
+`untracked` files, and whether it is `clean` and `pullable` (with the `reason`
+when it is not). It takes the same `repo`/`group` selection as the other
+endpoints.
+
+`POST /api/repositories/pull` takes `{"repos": [...]}` — an empty or absent
+list means every scanned repository — and answers one result per repository:
+`updated` when its HEAD moved, `skipped` with a `reason` when it was left
+alone, or an `error`. Repositories are fetched four at a time.
 
 `PUT /api/groups` takes the whole list — `{"groups":[{"name":…,"repositories":[…]}]}`
 — and answers with what was stored. A group needs a name and at least one

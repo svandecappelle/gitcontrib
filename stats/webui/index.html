@@ -201,6 +201,20 @@
     .chip.group .del { border: 0; background: none; color: var(--muted); padding: 0 4px; font-size: 13px; line-height: 1; cursor: pointer; }
     .chip.group .del:hover { background: none; color: var(--del); }
 
+    /* Repository updates */
+    .section-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .section-head .section-title { margin: 0; }
+    .section-head .actions { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+    .section-head .note { color: var(--muted); font-size: 12px; }
+    .chip.state.clean { border-color: rgba(63, 185, 80, .5); color: var(--add); }
+    .chip.state.dirty { border-color: rgba(248, 81, 73, .5); color: var(--del); }
+    .chip.state.behind { border-color: rgba(47, 129, 247, .6); color: var(--accent); }
+    button.small { padding: 4px 10px; font-size: 12px; }
+    .pull-report { display: flex; flex-direction: column; gap: 4px; font-size: 12px; margin-top: 4px; }
+    .pull-report .ok { color: var(--add); }
+    .pull-report .ko { color: var(--del); }
+    .pull-report .skip { color: var(--muted); }
+
     /* Identity cards */
     .idgrid { display: grid; gap: 20px; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); }
     .idcard { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; display: flex; flex-direction: column; gap: 12px; }
@@ -1068,6 +1082,7 @@
       clearTimeout(pollTimer);
       loadStats().catch(showError);
       loadIdentity();
+      loadStatuses();
     }
 
     // drillDown filters the analysis to a single contributor, matching all of
@@ -1239,7 +1254,7 @@
         const forget = el('button', { type: 'button', class: 'link' }, 'Forget the token on this browser');
         forget.addEventListener('click', () => {
           setEditToken('');
-          loadConfig().then(renderSettings);
+          loadConfig().then(() => { renderSettings(); renderIdentity(); });
         });
         return el('div', { class: 'notice' }, [
           el('span', {}, 'Editing is unlocked on this browser. '), forget,
@@ -1254,6 +1269,7 @@
           if (data && data.authorized) settingsMsg('Editing unlocked.', 'ok');
           else { setEditToken(''); settingsMsg('That token was refused.', 'error'); }
           renderSettings();
+          renderIdentity();
         });
       };
       unlock.addEventListener('click', submit);
@@ -1393,6 +1409,150 @@
         settingsMsg(err.message, 'error');
         loadConfig().then(renderSettings);
       });
+    }
+
+    // ---- Updating the repositories ------------------------------------------
+    // The working state of each repository comes from git itself, and a
+    // repository holding local changes is never touched: an update is a
+    // fast-forward pull, or nothing.
+
+    let repoStatus = {};        // folder -> status from /api/repositories/status
+    let pullReport = null;      // what the last update did
+    let pulling = false;
+
+    function loadStatuses() {
+      const selection = identityQuery();
+      return fetch('api/repositories/status' + (selection ? '?' + selection : ''))
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => {
+          if (!data) return;
+          repoStatus = {};
+          (data.repositories || []).forEach(s => { repoStatus[s.folder] = s; });
+          renderIdentity();
+        })
+        .catch(() => { /* the cards stay usable without the working state */ });
+    }
+
+    // statusChip says, in a few words, what state a repository's worktree is
+    // in — and, when it cannot be updated, why.
+    function statusChip(status) {
+      if (!status) return null;
+      if (status.error) return chip('unreadable', status.error);
+      if (!status.clean) {
+        const dirty = chip(`${status.changes} local change${status.changes === 1 ? '' : 's'}`,
+          'Local changes: this repository is never updated automatically');
+        dirty.className = 'chip state dirty';
+        return dirty;
+      }
+      if (!status.pullable) {
+        return chip(status.reason || 'nothing to update', 'This repository cannot be fast-forwarded');
+      }
+      const c = chip(status.behind ? `${status.behind} behind` : 'clean',
+        `Tracking ${status.upstream}`);
+      c.className = 'chip state ' + (status.behind ? 'behind' : 'clean');
+      return c;
+    }
+
+    // pullButton updates one repository. A repository that cannot be
+    // fast-forwarded gets no button at all: its chip already says why.
+    function pullButton(folder) {
+      const status = repoStatus[folder];
+      if (!status || !status.pullable) return null;
+      const button = el('button', { type: 'button', class: 'small' }, 'Pull');
+      if (!canEdit()) {
+        button.disabled = true;
+        button.title = 'Unlock editing in Settings to update repositories';
+      } else {
+        button.title = `Fast-forward ${status.branch} from ${status.upstream}`;
+        button.addEventListener('click', () => pullRepositories([folder]));
+      }
+      if (pulling) button.disabled = true;
+      return button;
+    }
+
+    // pullableFolders are the repositories on screen that can be updated.
+    function pullableFolders() {
+      return ((identityData && identityData.repositories) || [])
+        .map(card => card.folder)
+        .filter(folder => (repoStatus[folder] || {}).pullable);
+    }
+
+    function pullRepositories(folders) {
+      if (!folders.length || pulling) return;
+      pulling = true;
+      pullReport = { pending: folders.length };
+      renderIdentity();
+      fetch('api/repositories/pull', {
+        method: 'POST',
+        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ repos: folders }),
+      }).then(r => {
+        if (r.status === 401 || r.status === 403) {
+          return r.text().then(t => { throw new Error((t.trim() || 'not allowed') + ' — see Settings.'); });
+        }
+        if (!r.ok) return r.text().then(t => { throw new Error(t.trim() || ('HTTP ' + r.status)); });
+        return r.json();
+      }).then(data => {
+        pulling = false;
+        pullReport = { results: data.results || [] };
+        // Whatever moved changes both the statistics and the cards.
+        if (pullReport.results.some(result => result.updated)) {
+          loadStats().catch(showError);
+          loadIdentity();
+        }
+        return loadStatuses();
+      }).catch(err => {
+        pulling = false;
+        pullReport = { error: err.message };
+        renderIdentity();
+      });
+    }
+
+    // pullReportView reports what the last update did, repository by
+    // repository.
+    function pullReportView() {
+      if (!pullReport) return null;
+      if (pullReport.pending) {
+        return el('div', { class: 'pull-report' }, [
+          el('span', { class: 'skip' }, [el('span', { class: 'spinner' }),
+            ` Updating ${pullReport.pending} repositor${pullReport.pending === 1 ? 'y' : 'ies'}…`]),
+        ]);
+      }
+      if (pullReport.error) {
+        return el('div', { class: 'pull-report' }, [el('span', { class: 'ko' }, pullReport.error)]);
+      }
+      const lines = (pullReport.results || []).map(result => {
+        if (result.error) return el('span', { class: 'ko' }, `${result.name}: ${result.error}`);
+        if (result.skipped) return el('span', { class: 'skip' }, `${result.name}: left alone — ${result.reason}`);
+        if (result.updated) return el('span', { class: 'ok' }, `${result.name}: updated`);
+        return el('span', { class: 'skip' }, `${result.name}: already up to date`);
+      });
+      return el('div', { class: 'pull-report' }, lines);
+    }
+
+    // identityHeader titles the section and carries the update-all button.
+    function identityHeader() {
+      const pullable = pullableFolders();
+      const actions = [];
+      if (pullable.length) {
+        const all = el('button', { type: 'button', class: 'small' },
+          `Pull ${pullable.length} repositor${pullable.length === 1 ? 'y' : 'ies'}`);
+        all.disabled = pulling || !canEdit();
+        all.title = canEdit()
+          ? 'Fast-forward every repository with no local change'
+          : 'Unlock editing in Settings to update repositories';
+        all.addEventListener('click', () => pullRepositories(pullable));
+        actions.push(all);
+      }
+      const held = Object.values(repoStatus).filter(s => s && !s.clean && !s.error).length;
+      if (held) {
+        actions.push(el('span', { class: 'note', title: 'They are never updated automatically' },
+          `${held} with local changes`));
+      }
+      return el('div', { class: 'section-head' }, [
+        el('h2', { class: 'section-title' }, 'Identity'),
+        el('div', { class: 'actions' }, actions),
+      ]);
     }
 
     // ---- Identity cards ---------------------------------------------------
@@ -1558,9 +1718,11 @@
           el('h3', { class: 'idname' }, [name]),
           el('div', { class: 'idchips' }, [
             card.branch ? branchChip(card.branch) : null,
+            statusChip(repoStatus[card.folder]),
             card.tags ? chip([el('b', {}, fmtInt(card.tags)), ' tags']) : null,
             card.branches ? chip([el('b', {}, fmtInt(card.branches)), ' branches']) : null,
           ]),
+          el('div', { class: 'actions', style: 'margin-left:auto' }, [pullButton(card.folder)]),
         ]),
         el('div', {}, [
           el('div', { class: 'idmeta' }, card.path || card.folder),
@@ -1613,7 +1775,7 @@
     // payload, whether or not it has arrived yet.
     function identitySection() {
       return el('section', {}, [
-        el('h2', { class: 'section-title' }, 'Identity'),
+        el('div', { id: 'identity-head' }),
         el('div', { id: 'identity-body' }),
       ]);
     }
@@ -1632,6 +1794,11 @@
     function renderIdentity() {
       const body = document.getElementById('identity-body');
       if (!body) return;
+      const head = document.getElementById('identity-head');
+      head.innerHTML = '';
+      head.appendChild(identityHeader());
+      const report = pullReportView();
+      if (report) head.appendChild(report);
       body.innerHTML = '';
 
       if (identityError) {
@@ -1653,15 +1820,21 @@
       body.appendChild(grid);
     }
 
-    // loadIdentity fetches the cards for the selected repository (or all of
-    // them), keeping the previous ones on screen unless the selection changed.
-    function loadIdentity() {
-      // The cards only depend on which repositories are looked at.
+    // identityQuery is the repository selection the cards and the working
+    // states are read for.
+    function identityQuery() {
       const selection = new URLSearchParams();
       const query = new URLSearchParams(currentQuery.replace(/^\?/, ''));
       query.getAll('repo').forEach(repo => selection.append('repo', repo));
       if (query.get('group')) selection.set('group', query.get('group'));
-      const key = selection.toString();
+      return selection.toString();
+    }
+
+    // loadIdentity fetches the cards for the selected repository (or all of
+    // them), keeping the previous ones on screen unless the selection changed.
+    function loadIdentity() {
+      // The cards only depend on which repositories are looked at.
+      const key = identityQuery();
       if (key !== identityRepo) {
         identityRepo = key;
         identityData = null;
@@ -1883,8 +2056,10 @@
     // then filled from the parameters the server echoes back.
     currentQuery = window.location.search;
     loadGroups();
+    loadConfig().then(renderIdentity);
     loadStats().catch(showError);
     loadIdentity();
+    loadStatuses();
   </script>
 </body>
 </html>

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -174,6 +175,64 @@ func Serve(opts LaunchOptions, srv ServeOptions) error {
 			return
 		}
 		writeJSON(w, map[string]interface{}{"path": body.Path, "folders": folders})
+	})
+
+	mux.HandleFunc("/api/repositories/status", func(w http.ResponseWriter, r *http.Request) {
+		folders, err := cache.identityFolders(r)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		writeJSON(w, map[string]interface{}{"repositories": RepositoryStatuses(folders)})
+	})
+
+	// Updating a repository writes to the filesystem, so it is guarded like
+	// the configuration is.
+	mux.HandleFunc("/api/repositories/pull", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if !allowEdit(w, r, srv) {
+			return
+		}
+		var body struct {
+			Repos []string `json:"repos"`
+		}
+		if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxGroupsBody)).Decode(&body); err != nil {
+			http.Error(w, "invalid payload: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		// Only the repositories this server scans can be updated, and an empty
+		// list means every one of them.
+		scanned := cache.folders()
+		folders := scanned
+		if len(body.Repos) > 0 {
+			for _, repo := range body.Repos {
+				if !containsFolder(scanned, repo) {
+					http.Error(w, "unknown repository: "+repo, http.StatusBadRequest)
+					return
+				}
+			}
+			folders = intersectFolders(body.Repos, scanned)
+		}
+
+		results := PullRepositories(folders)
+
+		// What moved is no longer what was measured.
+		var updated []string
+		for _, result := range results {
+			if result.Updated {
+				updated = append(updated, result.Folder)
+			}
+		}
+		if len(updated) > 0 {
+			log.Printf("Updated %d repositor%s: %s", len(updated), map[bool]string{true: "y", false: "ies"}[len(updated) == 1], strings.Join(updated, ", "))
+			cache.invalidateFolders(updated)
+			identities.forceRefresh(updated)
+		}
+		writeJSON(w, map[string]interface{}{"results": results})
 	})
 
 	mux.HandleFunc("/api/stats", func(w http.ResponseWriter, r *http.Request) {

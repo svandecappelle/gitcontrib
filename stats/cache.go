@@ -30,6 +30,9 @@ type Params struct {
 type cacheEntry struct {
 	Stats     AggregatedStats `json:"stats"`
 	UpdatedAt time.Time       `json:"updatedAt"`
+	// Folders is what the entry was computed over, so an entry can be dropped
+	// when one of its repositories changes under it (a pull, for instance).
+	Folders []string `json:"folders,omitempty"`
 }
 
 // statsCache keeps the last computed statistics per parameter set in memory,
@@ -241,7 +244,7 @@ func (c *statsCache) scan(key string, opts LaunchOptions) {
 	log.Printf("Analyzing commits (%s)", describeOpts(opts))
 
 	stats := Aggregate(Launch(opts))
-	entry := &cacheEntry{Stats: stats, UpdatedAt: time.Now()}
+	entry := &cacheEntry{Stats: stats, UpdatedAt: time.Now(), Folders: opts.Folders}
 	c.mu.Lock()
 	c.entries[key] = entry
 	c.mu.Unlock()
@@ -250,6 +253,35 @@ func (c *statsCache) scan(key string, opts LaunchOptions) {
 	log.Printf("Analysis done (%s): %d commits, %d contributors in %s",
 		describeOpts(opts), stats.TotalCommits, len(stats.Contributors),
 		time.Since(start).Round(time.Millisecond))
+}
+
+// invalidateFolders drops every cached result covering one of the folders,
+// because their history just changed. An entry from an older cache file, which
+// does not say what it covers, is dropped too rather than trusted.
+func (c *statsCache) invalidateFolders(folders []string) {
+	if len(folders) == 0 {
+		return
+	}
+	changed := map[string]bool{}
+	for _, folder := range folders {
+		changed[folder] = true
+	}
+
+	c.mu.Lock()
+	for key, entry := range c.entries {
+		drop := len(entry.Folders) == 0
+		for _, folder := range entry.Folders {
+			if changed[folder] {
+				drop = true
+				break
+			}
+		}
+		if drop {
+			delete(c.entries, key)
+		}
+	}
+	c.mu.Unlock()
+	c.persist()
 }
 
 // describeOpts summarizes a set of launch options for logging.
