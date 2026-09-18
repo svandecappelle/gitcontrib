@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,6 +11,7 @@ import (
 	"time"
 
 	"github.com/go-git/go-git/v5"
+	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/object"
 	"github.com/schollz/progressbar/v3"
 )
@@ -267,8 +267,16 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 	// get the commits history until endDate is not reached
 	iterator, err := repo.Log(&git.LogOptions{Since: &r.BeginOfScan, Until: &r.EndOfScan})
 	if err != nil {
-		log.Fatalf("Cannot get repository history: %s", err)
-		return err
+		// A repository whose HEAD leads nowhere — freshly initialized, or on an
+		// unborn branch — simply has no commit to count. It is not a failure:
+		// the other repositories of the scan carry on.
+		if errors.Is(err, plumbing.ErrReferenceNotFound) {
+			if !r.Options.Silent {
+				Print(Message, fmt.Sprintf("\nNo commit yet in %s, skipping it\n", path))
+			}
+			return nil
+		}
+		return fmt.Errorf("cannot read the history of %s: %w", path, err)
 	}
 	// Compile the include/exclude patterns once, up front, rather than for
 	// every commit stat as we iterate.
@@ -367,8 +375,7 @@ func fillCommits(r *StatsResult, emailOrUsername *string, path string, bar *prog
 		return nil
 	})
 	if err != nil {
-		log.Fatalf("Error on git-log iterate: %s", err)
-		return err
+		return fmt.Errorf("cannot walk the history of %s: %w", path, err)
 	}
 
 	return nil

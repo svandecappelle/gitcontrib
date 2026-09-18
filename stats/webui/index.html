@@ -1592,7 +1592,7 @@
           el('h3', { class: 'idname' }, 'All repositories'),
           el('div', { class: 'idchips' }, [
             chip([el('b', {}, fmtInt(all.repositories)), ' repositories']),
-            all.failed ? chip([el('b', {}, fmtInt(all.failed)), ' unreadable']) : null,
+            all.failed ? chip([el('b', {}, fmtInt(all.failed)), ' skipped'], 'Repositories holding no commit, or that could not be read') : null,
             all.tags ? chip([el('b', {}, fmtInt(all.tags)), ' tags']) : null,
             all.branches ? chip([el('b', {}, fmtInt(all.branches)), ' branches']) : null,
           ]),

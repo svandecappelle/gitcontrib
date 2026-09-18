@@ -237,6 +237,9 @@ binary files count toward the size but not toward the lines. Lines of code
 count the source languages only, leaving out documentation, data and
 configuration files, which the "all lines" figure includes.
 
+A repository holding no commit yet is not an error: it is skipped by the scan,
+and its card simply reads "no commit yet".
+
 Cards are computed per repository and kept in memory (they are not written to
 the cache file), warmed at startup and rebuilt once older than the TTL or when
 a refresh is requested. The first build of a large repository walks its whole

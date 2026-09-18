@@ -2,6 +2,7 @@ package stats
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -145,8 +146,13 @@ func BuildIdentity(folder string) RepositoryIdentity {
 
 	head, err := repo.Head()
 	if err != nil {
-		// An empty repository (no commit yet) is a valid, if bare, identity.
-		card.Error = fmt.Sprintf("no HEAD: %s", err)
+		// A repository with an unborn HEAD simply has no commit yet; anything
+		// else is a repository that cannot be read.
+		if errors.Is(err, plumbing.ErrReferenceNotFound) {
+			card.Error = "no commit yet"
+		} else {
+			card.Error = fmt.Sprintf("cannot read HEAD: %s", err)
+		}
 		return card
 	}
 	if head.Name().IsBranch() {
